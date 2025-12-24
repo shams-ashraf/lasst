@@ -23,31 +23,44 @@ st.set_page_config(
 
 load_custom_css()
 
-if "processed" not in st.session_state:
-    st.session_state.processed = False
+DOCS_FOLDER = "/mount/src/test/documents"
+CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
+CHROMA_FOLDER = "./chroma_db"
+
+os.makedirs(DOCS_FOLDER, exist_ok=True)
+os.makedirs(CACHE_FOLDER, exist_ok=True)
+os.makedirs(CHROMA_FOLDER, exist_ok=True)
+
+if "collection" not in st.session_state:
     st.session_state.collection = None
 
 if "chats" not in st.session_state:
     st.session_state.chats = {}
     st.session_state.active_chat = None
 
-PDF_PASSWORD = "mbe2025"
-DOCS_FOLDER = "/mount/src/test/documents"
-CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
+client = chromadb.Client(
+    settings=chromadb.Settings(
+        persist_directory=CHROMA_FOLDER
+    )
+)
 
-os.makedirs(DOCS_FOLDER, exist_ok=True)
-os.makedirs(CACHE_FOLDER, exist_ok=True)
+collections = client.list_collections()
 
-if not st.session_state.processed:
+if collections:
+    collection = client.get_collection(
+        name=collections[0].name,
+        embedding_function=get_embedding_function()
+    )
+    st.session_state.collection = collection
+else:
     with st.spinner("📚 Processing documents..."):
         files = get_files_from_folder()
         if not files:
             st.error("No documents found")
             st.stop()
 
-        client = chromadb.Client()
         collection = client.create_collection(
-            name=f"docs_{uuid.uuid4().hex[:8]}",
+            name="biomed_docs",
             embedding_function=get_embedding_function()
         )
 
@@ -93,24 +106,48 @@ if not st.session_state.processed:
                 ids=[f"chunk_{j}" for j in range(i, min(i+500, len(all_chunks)))]
             )
 
+        client.persist()
         st.session_state.collection = collection
-        st.session_state.processed = True
 
-        if not st.session_state.chats:
-            cid = f"chat_{uuid.uuid4().hex[:6]}"
-            st.session_state.chats[cid] = {
-                "title": "New Chat",
-                "messages": [],
-                "context": []
-            }
-            st.session_state.active_chat = cid
-
-    st.rerun()
+if not st.session_state.chats:
+    cid = f"chat_{uuid.uuid4().hex[:6]}"
+    st.session_state.chats[cid] = {
+        "title": "New Chat",
+        "messages": [],
+        "context": []
+    }
+    st.session_state.active_chat = cid
 
 st.markdown("""
 <div class="main-card">
-    <h1 style='text-align: center; margin: 0;'>🧬 Biomedical Document Chatbot</h1>
-    <p style='text-align: center; margin-top: 10px;'>RAG Chatbot for Biomedical Engineering at Hochschule Anhalt</p>
+    <h1 style='text-align:center;margin:0;'>🧬 Biomedical Document Chatbot</h1>
+    <p style='text-align:center;margin-top:10px;'>RAG Chatbot for Biomedical Engineering at Hochschule Anhalt</p>
+</div>
+""", unsafe_allow_html=True)
+
+st.markdown("""
+<div class="main-card">
+<h2>ℹ️ About</h2>
+
+### 🎯 Features:
+- **Precise Citations**: Every answer includes file + page + table references
+- **Conversational**: Ask follow-up questions naturally
+- **Smart Context**: Understands references to previous answers
+- **Multi-language**: English, German, Arabic
+- **Fast**: Cached & persistent processing
+- **MBE-Specific**: Biomedical engineering regulations focused
+
+### 📋 Supported Documents:
+- 📄 Study & Examination Regulations (SPO)
+- 📚 Module Handbook
+- 📝 Scientific Writing Guides
+- 📃 Bachelor/Master Thesis Notes
+
+### 💡 Example Questions:
+- "How many modules in semester 1?"
+- "What are the thesis requirements?"
+- "Tell me about the internship" → then "summarize that"
+- "Compare exam types in SPO"
 </div>
 """, unsafe_allow_html=True)
 
@@ -123,32 +160,6 @@ with st.sidebar:
         with st.expander("📂 Files"):
             for f in files:
                 st.write(f"• {os.path.basename(f)}")
-
-    st.markdown("---")
-
-    st.markdown("### ℹ️ About")
-    st.markdown("""
-    ### 🎯 Features:
-    - **Precise Citations**: Every answer includes file + page + table references
-    - **Conversational**: Ask follow-up questions naturally ("summarize that", "tell me more")
-    - **Smart Context**: Understands when you refer to previous answers
-    - **Multi-language**: Supports English, German, and Arabic
-    - **Fast**: Cached processing for instant responses
-    - **MBE-Specific**: Optimized for biomedical engineering regulations
-
-    ### 📋 Supported Documents:
-    - 📄 Study & Examination Regulations (SPO)
-    - 📚 Module Handbook
-    - 📝 Guide for Writing Scientific Papers
-    - 📃 Notes on Bachelor/Master Theses
-    - ✍️ Scientific Writing Guidelines
-
-    ### 💡 Example Questions:
-    - "How many modules in semester 1?"
-    - "What are the thesis requirements?"
-    - "Tell me about the internship" → then "summarize that"
-    - "Compare exam types in SPO"
-    """)
 
     st.markdown("---")
     st.markdown("### 💬 Chats")
@@ -165,9 +176,8 @@ with st.sidebar:
 
     for cid in list(st.session_state.chats.keys()):
         col1, col2 = st.columns([5, 1])
-        title = st.session_state.chats[cid]["title"]
         with col1:
-            if st.button(f"💬 {title}", key=f"open_{cid}", use_container_width=True):
+            if st.button(f"💬 {st.session_state.chats[cid]['title']}", key=f"open_{cid}", use_container_width=True):
                 st.session_state.active_chat = cid
                 st.rerun()
         with col2:
@@ -176,10 +186,6 @@ with st.sidebar:
                 if st.session_state.active_chat == cid:
                     st.session_state.active_chat = None
                 st.rerun()
-
-if st.session_state.active_chat is None:
-    st.info("👈 Start a new chat")
-    st.stop()
 
 chat = st.session_state.chats[st.session_state.active_chat]
 messages = chat["messages"]
@@ -199,19 +205,16 @@ if query:
     if chat["title"] == "New Chat":
         chat["title"] = query[:40]
 
-    with st.spinner("Thinking..."):
-        res = st.session_state.collection.query(
-            query_texts=[query],
-            n_results=10
-        )
+    res = st.session_state.collection.query(
+        query_texts=[query],
+        n_results=10
+    )
 
-        chunks = []
-        for d, m in zip(res["documents"][0], res["metadatas"][0]):
-            chunks.append({"content": d, "metadata": m})
+    chunks = [{"content": d, "metadata": m} for d, m in zip(res["documents"][0], res["metadatas"][0])]
 
-        answer = answer_question_with_groq(query, chunks, messages)
-        messages.append({"role": "assistant", "content": answer})
-        chat["context"] = chunks
+    answer = answer_question_with_groq(query, chunks, messages)
+    messages.append({"role": "assistant", "content": answer})
+    chat["context"] = chunks
 
     st.rerun()
 
@@ -219,12 +222,8 @@ if chat["context"]:
     with st.expander("📄 Sources"):
         for i, c in enumerate(chat["context"][:5], 1):
             meta = c["metadata"]
-            src = meta.get("source", "Unknown")
-            page = meta.get("page", "N/A")
-            table = meta.get("table_number", "N/A")
-            is_table = meta.get("is_table", "False")
-            line = f"📄 Source {i}: {src} | Page {page}"
-            if is_table in [True, "True"]:
-                line += f" | Table {table}"
+            line = f"📄 Source {i}: {meta.get('source','Unknown')} | Page {meta.get('page','N/A')}"
+            if meta.get("is_table") in [True, "True"]:
+                line += f" | Table {meta.get('table_number','N/A')}"
             st.markdown(line)
             st.markdown(f"<div class='chunk-display'>{c['content'][:500]}...</div>", unsafe_allow_html=True)
