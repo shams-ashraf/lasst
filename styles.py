@@ -4,8 +4,8 @@ def load_custom_css():
         
     # Configuration
     st.set_page_config(
-        page_title="MBE Document Assistant - RAG Chatbot",
-        page_icon="🎓",
+        page_title=" Biomedical Document Chatbot",
+        page_icon="🧬",
         layout="wide"
     )
 
