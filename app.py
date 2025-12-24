@@ -12,7 +12,7 @@ class MBEAssistant:
             'groq_api_key': os.getenv("GROQ_API_KEY"),
             'groq_model': "llama-3.3-70b-versatile",
             'pdf_password': "mbe2025",
-            'docs_folder': "/mount/src/test/documents",
+            'docs_folder': "/mount/src/lasst/documents",
             'cache_folder': os.getenv("CACHE_FOLDER", "./cache"),
             'chunk_size': 1500,
             'overlap': 250
