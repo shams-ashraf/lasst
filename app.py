@@ -106,7 +106,6 @@ else:
                 ids=[f"chunk_{j}" for j in range(i, min(i+500, len(all_chunks)))]
             )
 
-        client.persist()
         st.session_state.collection = collection
 
 if not st.session_state.chats:
