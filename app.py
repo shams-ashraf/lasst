@@ -154,8 +154,6 @@ with st.sidebar:
 
     files = get_files_from_folder()
 
-    st.markdown("---")
-
     if st.button("# + New Chat", use_container_width=True):
         cid = f"chat_{uuid.uuid4().hex[:6]}"
         st.session_state.chats[cid] = {
@@ -165,6 +163,7 @@ with st.sidebar:
         }
         st.session_state.active_chat = cid
         st.rerun()
+     st.markdown("---")
     st.markdown("### 💬 Chats")
     for cid in list(st.session_state.chats.keys()):
         col1, col2 = st.columns([5, 1])
