@@ -162,7 +162,7 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 💬 Chats")
 
-    if st.button("🆕 New Chat", use_container_width=True):
+    if st.button("# + New Chat", use_container_width=True):
         cid = f"chat_{uuid.uuid4().hex[:6]}"
         st.session_state.chats[cid] = {
             "title": "New Chat",
