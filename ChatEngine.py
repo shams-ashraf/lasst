@@ -37,27 +37,9 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
     if not GROQ_API_KEY:
         return "❌ Please set GROQ_API_KEY in environment variables"
    
-    context_parts = []
-    sources_list = []  
-    for i, chunk_data in enumerate(relevant_chunks[:10], 1):
-        content = chunk_data['content']
-        meta = chunk_data['metadata']
-        
-        source = meta.get('source', 'Unknown')
-        page = meta.get('page', 'N/A')
-        is_table = meta.get('is_table', 'False')
-        table_num = meta.get('table_number', 'N/A')
-        
-        citation = f"[Source {i}: {source}, Page {page}"
-        if is_table == 'True' or is_table == True:
-            citation += f", Table {table_num}"
-        citation += "]"
-        
-        context_parts.append(content)
-        sources_list.append(citation)
-    
+    context_parts = [chunk['content'] for chunk in relevant_chunks[:10]]
     context = "\n\n---\n\n".join(context_parts)
-    
+
     conversation_summary = ""
     if chat_history and len(chat_history) > 0:
         recent = chat_history[-6:]  
@@ -67,7 +49,7 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
             content_preview = msg['content'][:300]
             conv_lines.append(f"{role}: {content_preview}")
         conversation_summary = "\n".join(conv_lines)
-   
+
     data = {
         "model": GROQ_MODEL,
         "messages": [
@@ -77,7 +59,7 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
 
 CRITICAL RULES:
 1. Answer ONLY from provided sources OR previous conversation if it's a follow-up question.
-2. ALWAYS cite sources at the END of the answer, not within the text..
+2. ALWAYS cite sources.
 3. For follow-up questions like "summarize", "tell me more", "explain that", or "what about that":
    - Check the conversation history FIRST
    - Summarize or expand on your PREVIOUS answer
@@ -88,8 +70,7 @@ CRITICAL RULES:
 8. For counting questions: Count precisely and list all items with citations
 9. Do NOT explain your thought process.
 10. Answer directly and clearly.
-
-Remember: You're helping MBE students understand their program requirements clearly and accurately."""
+11. Append all relevant sources ONLY at the END of the answer."""
             },
             {
                 "role": "user",
@@ -113,7 +94,21 @@ ANSWER:"""
         "temperature": 0.1,
         "max_tokens": 2000,
     }
-   
+
+    sources_list = []
+    for i, chunk_data in enumerate(relevant_chunks[:10], 1):
+        meta = chunk_data.get('metadata', {})
+        source = meta.get('source', 'Unknown')
+        page = meta.get('page', 'N/A')
+        is_table = meta.get('is_table', False)
+        table_num = meta.get('table_number', 'N/A')
+
+        citation = f"[Source {i}: {source}, Page {page}"
+        if is_table in ('True', True):
+            citation += f", Table {table_num}"
+        citation += "]"
+        sources_list.append(citation)
+
     try:
         response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -125,10 +120,10 @@ ANSWER:"""
             timeout=60
         )
         response.raise_for_status()
-        answer_text = response.json()["choices"][0]["message"]["content"]
+        answer_text = response.json()["choices"][0]["message"]["content"].strip()
 
         if sources_list:
-            answer_text += "\n\n📄 Sources:\n" + ",\n".join(sources_list)
+            answer_text += "\n\n📄 Sources:\n" + ", ".join(sources_list)
 
         return answer_text
     except Exception as e:
