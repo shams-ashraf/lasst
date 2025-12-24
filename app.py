@@ -518,6 +518,9 @@ def process_documents_automatically():
         st.session_state.processed = True
         return
     
+    # Create progress placeholder
+    progress_container = st.empty()
+    
     files_data = {}
     all_chunks = []
     all_metadata = []
@@ -528,10 +531,25 @@ def process_documents_automatically():
         name=collection_name,
         embedding_function=get_embedding_function()
     )
+    
+    total_files = len(available_files)
        
-    for filepath in available_files:
+    for idx, filepath in enumerate(available_files, 1):
         filename = os.path.basename(filepath)
         file_ext = filename.split('.')[-1].lower()
+        
+        # Update progress
+        percentage = int((idx / total_files) * 100)
+        progress_container.markdown(f"""
+        <div style='text-align: center; padding: 30px;'>
+            <h3 style='color: #00d4ff;'>🔄 Loading Documents... {percentage}%</h3>
+            <p style='color: #e8e8e8; font-size: 1.1rem;'>Processing: <strong>{filename}</strong></p>
+            <div style='background: rgba(255,255,255,0.1); border-radius: 10px; height: 30px; margin: 20px auto; max-width: 500px; overflow: hidden;'>
+                <div style='background: linear-gradient(90deg, #00d9ff 0%, #0099cc 100%); height: 100%; width: {percentage}%; transition: width 0.3s;'></div>
+            </div>
+            <p style='color: #a0a0a0;'>Document {idx} of {total_files}</p>
+        </div>
+        """, unsafe_allow_html=True)
         
         file_hash = get_file_hash(filepath)
         cache_key = f"{file_hash}_{file_ext}"
@@ -562,6 +580,9 @@ def process_documents_automatically():
             for chunk in file_info['chunks']:
                 all_chunks.append(chunk['content'])
                 all_metadata.append(chunk['metadata'])
+    
+    # Clear progress and finalize
+    progress_container.empty()
     
     if all_chunks:
         chunk_ids = [f"chunk_{uuid.uuid4().hex}" for _ in all_chunks]
@@ -650,6 +671,7 @@ with st.sidebar:
         with st.expander("📄 About This Chatbot", expanded=False):
             st.info("No documents loaded yet")
 
+# Get current chat messages
 current_messages = st.session_state.chat_sessions[st.session_state.current_chat_id]['messages']
 
 if st.session_state.processed:
@@ -712,9 +734,10 @@ if st.session_state.processed:
         
         st.rerun()
 else:
+    # This will only show on very first load before processing starts
     st.markdown("""
     <div style='text-align: center; padding: 50px;'>
-        <h3>🔄 Loading system...</h3>
-        <p>Please wait a moment while the assistant initializes.</p>
+        <h3 style='color: #00d4ff;'>🔄 Initializing system...</h3>
+        <p style='color: #e8e8e8;'>Please wait a moment</p>
     </div>
     """, unsafe_allow_html=True)
