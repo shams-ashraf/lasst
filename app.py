@@ -163,7 +163,6 @@ with st.sidebar:
             "messages": [],
             "context": []
         }
-        st.markdown("### 💬 Chats")
         st.session_state.active_chat = cid
         st.rerun()
 
@@ -179,6 +178,7 @@ with st.sidebar:
                 if st.session_state.active_chat == cid:
                     st.session_state.active_chat = None
                 st.rerun()
+st.markdown("### 💬 Chats")
 
 chat = st.session_state.chats[st.session_state.active_chat]
 messages = chat["messages"]
