@@ -1,132 +1,82 @@
-"""
-Chat Engine Module - مسؤول عن التواصل مع API والإجابة على الأسئلة
-"""
-import requests
-import uuid
+import streamlit as st
+from sentence_transformers import SentenceTransformer
 import chromadb
 from chromadb.utils import embedding_functions
-from typing import List, Dict, Optional
+import requests
+import os
 
-class Chat:
-    def __init__(self, config):
-        self.config = config
-        self.groq_api_key = config['groq_api_key']
-        self.groq_model = config['groq_model']
-        self.collection = None
-        self.client = None
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = "llama-3.3-70b-versatile"
+if not GROQ_API_KEY:
+    st.error("⚠️ GROQ_API_KEY not found in environment variables!")
+
+def get_embedding_function():
+    return embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name="intfloat/multilingual-e5-large"
+    )
+
+def build_conversational_prompt(query, chat_history):
+    """Build context-aware prompt with chat history"""
+    if not chat_history:
+        return query
     
-    def get_embedding_function(self):
-        """Get sentence transformer embedding function"""
-        return embedding_functions.SentenceTransformerEmbeddingFunction(
-            model_name="intfloat/multilingual-e5-large"
-        )
+    # Last 3 exchanges for context
+    recent_history = chat_history[-6:]  # 3 Q&A pairs
+    context_lines = []
     
-    def initialize_collection(self, all_chunks: List[str], 
-                             all_metadata: List[Dict]) -> bool:
-        """Initialize ChromaDB collection with documents"""
-        try:
-            self.client = chromadb.Client()
-            collection_name = f"docs_{uuid.uuid4().hex[:8]}"
-            self.collection = self.client.create_collection(
-                name=collection_name,
-                embedding_function=self.get_embedding_function()
-            )
-            
-            # Add documents in batches
-            batch_size = 500
-            for i in range(0, len(all_chunks), batch_size):
-                batch = all_chunks[i:i+batch_size]
-                metadata_batch = all_metadata[i:i+batch_size]
-                self.collection.add(
-                    documents=batch,
-                    ids=[f"chunk_{i+j}" for j in range(len(batch))],
-                    metadatas=metadata_batch
-                )
-            
-            return True
-        except Exception as e:
-            print(f"Error initializing collection: {str(e)}")
-            return False
+    for msg in recent_history:
+        role = msg['role']
+        content = msg['content'][:200]  # Limit length
+        if role == 'user':
+            context_lines.append(f"Previous Q: {content}")
+        else:
+            context_lines.append(f"Previous A: {content}")
     
-    def search_documents(self, query: str, n_results: int = 10) -> List[Dict]:
-        """Search for relevant document chunks"""
-        if not self.collection:
-            return []
+    history_context = "\n".join(context_lines)
+    return f"Conversation context:\n{history_context}\n\nCurrent question: {query}"
+
+def answer_question_with_groq(query, relevant_chunks, chat_history=None):
+    if not GROQ_API_KEY:
+        return "❌ Please set GROQ_API_KEY in environment variables"
+   
+    # Build context with precise citations
+    context_parts = []
+    for i, chunk_data in enumerate(relevant_chunks[:10], 1):
+        content = chunk_data['content']
+        meta = chunk_data['metadata']
         
-        try:
-            results = self.collection.query(
-                query_texts=[query],
-                n_results=n_results
-            )
-            
-            # Build chunk objects with metadata
-            relevant_chunks = []
-            for content, metadata in zip(results["documents"][0], 
-                                        results["metadatas"][0]):
-                relevant_chunks.append({
-                    'content': content,
-                    'metadata': metadata
-                })
-            
-            return relevant_chunks
-        except Exception as e:
-            print(f"Search error: {str(e)}")
-            return []
+        # Handle string metadata from ChromaDB
+        source = meta.get('source', 'Unknown')
+        page = meta.get('page', 'N/A')
+        is_table = meta.get('is_table', 'False')
+        table_num = meta.get('table_number', 'N/A')
+        
+        citation = f"[Source {i}: {source}, Page {page}"
+        if is_table == 'True' or is_table == True:
+            citation += f", Table {table_num}"
+        citation += "]"
+        
+        context_parts.append(f"{citation}\n{content}")
     
-    def build_context_with_citations(self, relevant_chunks: List[Dict]) -> str:
-        """Build context string with proper citations"""
-        context_parts = []
-        
-        for i, chunk_data in enumerate(relevant_chunks[:10], 1):
-            content = chunk_data['content']
-            meta = chunk_data['metadata']
-            
-            source = meta.get('source', 'Unknown')
-            page = meta.get('page', 'N/A')
-            is_table = meta.get('is_table', 'False')
-            table_num = meta.get('table_number', 'N/A')
-            
-            citation = f"[Source {i}: {source}, Page {page}"
-            if is_table == 'True' or is_table == True:
-                citation += f", Table {table_num}"
-            citation += "]"
-            
-            context_parts.append(f"{citation}\n{content}")
-        
-        return "\n\n---\n\n".join(context_parts)
+    context = "\n\n---\n\n".join(context_parts)
     
-    def build_conversation_summary(self, chat_history: List[Dict]) -> str:
-        """Build conversation summary for context"""
-        if not chat_history or len(chat_history) == 0:
-            return "No previous conversation"
-        
+    # Build conversation history for follow-ups
+    conversation_summary = ""
+    if chat_history and len(chat_history) > 0:
         recent = chat_history[-6:]  # Last 3 Q&A pairs
         conv_lines = []
-        
         for msg in recent:
             role = "User" if msg['role'] == 'user' else "Assistant"
-            content_preview = msg['content'][:300]
+            content_preview = msg['content'][:300]  # Longer preview
             conv_lines.append(f"{role}: {content_preview}")
-        
-        return "\n".join(conv_lines)
-    
-    def generate_answer(self, query: str, relevant_chunks: List[Dict], 
-                       chat_history: Optional[List[Dict]] = None) -> str:
-        """Generate answer using Groq API"""
-        if not self.groq_api_key:
-            return "❌ GROQ_API_KEY not configured"
-        
-        # Build context and conversation summary
-        context = self.build_context_with_citations(relevant_chunks)
-        conversation_summary = self.build_conversation_summary(chat_history)
-        
-        # Prepare API request
-        data = {
-            "model": self.groq_model,
-            "messages": [
-                {
-                    "role": "system",
-                    "content": """You are a precise MBE Document Assistant at Hochschule Anhalt specializing in Biomedical Engineering regulations.
+        conversation_summary = "\n".join(conv_lines)
+   
+    data = {
+        "model": GROQ_MODEL,
+        "messages": [
+            {
+                "role": "system",
+                "content": """You are a precise MBE Document Assistant at Hochschule Anhalt specializing in Biomedical Engineering regulations.
 
 CRITICAL RULES:
 1. Answer ONLY from provided sources OR previous conversation if it's a follow-up question
@@ -146,11 +96,11 @@ FOLLOW-UP DETECTION:
 - New factual questions → Use sources
 
 Remember: You're helping MBE students understand their program requirements clearly and accurately."""
-                },
-                {
-                    "role": "user",
-                    "content": f"""CONVERSATION HISTORY (use for follow-up questions):
-{conversation_summary}
+            },
+            {
+                "role": "user",
+                "content": f"""CONVERSATION HISTORY (use for follow-up questions):
+{conversation_summary if conversation_summary else "No previous conversation"}
 
 DOCUMENT SOURCES (use for new factual questions):
 {context}
@@ -163,36 +113,23 @@ Instructions:
 - Always be precise and cite your sources
 
 ANSWER:"""
-                }
-            ],
-            "temperature": 0.1,
-            "max_tokens": 2000,
-        }
-        
-        try:
-            response = requests.post(
-                "https://api.groq.com/openai/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {self.groq_api_key}",
-                    "Content-Type": "application/json"
-                },
-                json=data,
-                timeout=60
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"]
-        except Exception as e:
-            return f"❌ Error: {str(e)}"
-    
-    def answer_question(self, query: str, 
-                       chat_history: Optional[List[Dict]] = None) -> tuple:
-        """Main method to answer questions
-        Returns: (answer, relevant_chunks)
-        """
-        # Search for relevant documents
-        relevant_chunks = self.search_documents(query)
-        
-        # Generate answer
-        answer = self.generate_answer(query, relevant_chunks, chat_history)
-        
-        return answer, relevant_chunks
+            }
+        ],
+        "temperature": 0.1,  # Slightly higher for better conversational flow
+        "max_tokens": 2000,
+    }
+   
+    try:
+        response = requests.post(
+            "https://api.groq.com/openai/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {GROQ_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json=data,
+            timeout=60
+        )
+        response.raise_for_status()
+        return response.json()["choices"][0]["message"]["content"]
+    except Exception as e:
+        return f"❌ Error connecting to Groq: {str(e)}"
