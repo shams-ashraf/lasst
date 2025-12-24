@@ -155,7 +155,6 @@ with st.sidebar:
     files = get_files_from_folder()
 
     st.markdown("---")
-    st.markdown("### 💬 Chats")
 
     if st.button("# + New Chat", use_container_width=True):
         cid = f"chat_{uuid.uuid4().hex[:6]}"
@@ -164,6 +163,7 @@ with st.sidebar:
             "messages": [],
             "context": []
         }
+        st.markdown("### 💬 Chats")
         st.session_state.active_chat = cid
         st.rerun()
 
