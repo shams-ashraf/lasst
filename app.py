@@ -18,7 +18,7 @@ if 'processed' not in st.session_state:
 # Configuration
 
 PDF_PASSWORD = "mbe2025"
-DOCS_FOLDER = "/mount/src/lasst/documents"
+DOCS_FOLDER = "/mount/src/test/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
@@ -34,7 +34,7 @@ st.markdown("""
 
 # Sidebar for document management
 with st.sidebar:
-    st.markdown("### 📚 Document Management")
+    st.markdown("### 🧬 BioMed Doc Chat")
     
     available_files = get_files_from_folder()
     if not available_files:
