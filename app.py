@@ -27,7 +27,7 @@ os.makedirs(CACHE_FOLDER, exist_ok=True)
 # Main UI
 st.markdown("""
 <div class="main-card">
-    <h1 style='text-align: center; margin: 0;'>🎓 MBE Document Assistant</h1>
+    <h1 style='text-align: center; margin: 0;'>🧬 Biomedical Document Chatbot</h1>
     <p style='text-align: center; margin-top: 10px;'>RAG Chatbot for Biomedical Engineering at Hochschule Anhalt</p>
 </div>
 """, unsafe_allow_html=True)
