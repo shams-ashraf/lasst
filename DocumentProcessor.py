@@ -7,7 +7,6 @@ import os
 import pickle
 import hashlib
 
-# Configuration
 PDF_PASSWORD = "mbe2025"
 DOCS_FOLDER = "/mount/src/lasst/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
@@ -15,7 +14,6 @@ CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 os.makedirs(DOCS_FOLDER, exist_ok=True)
 os.makedirs(CACHE_FOLDER, exist_ok=True)
 
-# Helper Functions
 def get_file_hash(filepath):
     hash_md5 = hashlib.md5()
     with open(filepath, "rb") as f:
@@ -136,7 +134,6 @@ def create_smart_chunks(text, chunk_size=1000, overlap=200, page_num=None, sourc
     words = text.split()
     chunks = []
     
-    # Clean metadata - ChromaDB doesn't accept None values
     metadata = {
         'page': str(page_num) if page_num is not None else "N/A",
         'source': source_file if source_file else "Unknown",
@@ -244,13 +241,11 @@ def extract_pdf_detailed(filepath):
        
         all_elements.sort(key=lambda x: x['y_position'])
        
-        # Add document title header at the start of each page
         page_text = f"\n# Document: {filename} - Official MBE Regulations\n\n"
         page_text += f"\n{'═' * 60}\n📄 Page {page_num + 1}\n{'═' * 60}\n\n"
         for element in all_elements:
             page_text += element['content'] + "\n\n"
        
-        # Create chunks with metadata
         page_chunks = create_smart_chunks(
             page_text, 
             chunk_size=1500, 
@@ -260,12 +255,11 @@ def extract_pdf_detailed(filepath):
             is_table=False
         )
         
-        # Add table chunks separately with table metadata
         for element in all_elements:
             if element['type'] == 'table':
                 table_chunks = create_smart_chunks(
                     element['content'],
-                    chunk_size=2000,  # Larger size for tables
+                    chunk_size=2000,  
                     overlap=0,
                     page_num=element['page'],
                     source_file=filename,
@@ -314,7 +308,6 @@ def extract_docx_detailed(filepath):
                     )
                     if table_text:
                         all_text.append(table_text)
-                        # Add table as separate chunk
                         table_chunks = create_smart_chunks(
                             table_text,
                             chunk_size=2000,
@@ -368,4 +361,3 @@ def get_files_from_folder():
     for ext in supported_extensions:
         files.extend(glob.glob(os.path.join(DOCS_FOLDER, ext)))
     return files
-
