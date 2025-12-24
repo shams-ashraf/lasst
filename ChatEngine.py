@@ -20,13 +20,12 @@ def build_conversational_prompt(query, chat_history):
     if not chat_history:
         return query
     
-    # Last 3 exchanges for context
-    recent_history = chat_history[-6:]  # 3 Q&A pairs
+    recent_history = chat_history[-6:]  
     context_lines = []
     
     for msg in recent_history:
         role = msg['role']
-        content = msg['content'][:200]  # Limit length
+        content = msg['content'][:200]  
         if role == 'user':
             context_lines.append(f"Previous Q: {content}")
         else:
@@ -38,9 +37,8 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
     if not GROQ_API_KEY:
         return "❌ Please set GROQ_API_KEY in environment variables"
    
-    # جمع المعلومات من المصادر
     context_parts = []
-    sources_list = []  # لتخزين المصادر لآخر الإجابة
+    sources_list = []  
     for i, chunk_data in enumerate(relevant_chunks[:10], 1):
         content = chunk_data['content']
         meta = chunk_data['metadata']
@@ -60,10 +58,9 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
     
     context = "\n\n---\n\n".join(context_parts)
     
-    # بناء المحادثة السابقة
     conversation_summary = ""
     if chat_history and len(chat_history) > 0:
-        recent = chat_history[-6:]  # آخر 3 تبادلات Q&A
+        recent = chat_history[-6:]  
         conv_lines = []
         for msg in recent:
             role = "User" if msg['role'] == 'user' else "Assistant"
@@ -80,7 +77,7 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
 
 CRITICAL RULES:
 1. Answer ONLY from provided sources OR previous conversation if it's a follow-up question.
-2. ALWAYS cite sources.
+2. ALWAYS cite sources at the END of the answer, not within the text..
 3. For follow-up questions like "summarize", "tell me more", "explain that", or "what about that":
    - Check the conversation history FIRST
    - Summarize or expand on your PREVIOUS answer
@@ -91,7 +88,6 @@ CRITICAL RULES:
 8. For counting questions: Count precisely and list all items with citations
 9. Do NOT explain your thought process.
 10. Answer directly and clearly.
-11. Append all relevant sources ONLY at the END of the answer, not within the text.
 
 Remember: You're helping MBE students understand their program requirements clearly and accurately."""
             },
@@ -131,7 +127,6 @@ ANSWER:"""
         response.raise_for_status()
         answer_text = response.json()["choices"][0]["message"]["content"]
 
-        # إضافة المصادر في آخر الإجابة بشكل واضح
         if sources_list:
             answer_text += "\n\n📄 Sources:\n" + ",\n".join(sources_list)
 
