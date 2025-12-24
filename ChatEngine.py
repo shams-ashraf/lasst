@@ -33,6 +33,7 @@ def build_conversational_prompt(query, chat_history):
     
     history_context = "\n".join(context_lines)
     return f"Conversation context:\n{history_context}\n\nCurrent question: {query}"
+
 def answer_question_with_groq(query, relevant_chunks, chat_history=None):
     if not GROQ_API_KEY:
         return "❌ Please set GROQ_API_KEY in environment variables"
@@ -60,17 +61,11 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
 CRITICAL RULES:
 1. Answer ONLY from provided sources OR previous conversation if it's a follow-up question.
 2. ALWAYS cite sources.
-3. For follow-up questions like "summarize", "tell me more", "explain that", or "what about that":
-   - Check the conversation history FIRST
-   - Summarize or expand on your PREVIOUS answer
-4. If user says "summarize that" or "summarize it": Condense your LAST answer (from conversation history)
-5. If no relevant info in sources OR history: "No sufficient information in the available documents"
-6. Use the SAME language as the question (English/German/Arabic)
-7. Be CONCISE - short, direct answers unless asked to elaborate
-8. For counting questions: Count precisely and list all items with citations
-9. Do NOT explain your thought process.
-10. Answer directly and clearly.
-11. Append all relevant sources ONLY at the END of the answer."""
+3. Use the SAME language as the question (English/German/Arabic)
+4. Be concise, short, direct answers unless asked to elaborate
+5. For counting questions: Count precisely and list all items with citations
+6. Do NOT explain your thought process
+7. Append all relevant sources ONLY at the END of the answer"""
             },
             {
                 "role": "user",
@@ -81,12 +76,6 @@ DOCUMENT SOURCES (use for new factual questions):
 {context}
 
 CURRENT QUESTION: {query}
-
-Instructions: 
-- If this is a follow-up (summarize/elaborate/that/it), answer from conversation history
-- If this is a new question, answer from sources
-- Do NOT include your thought process
-- Append all relevant sources ONLY at the END of the answer
 
 ANSWER:"""
             }
@@ -100,13 +89,7 @@ ANSWER:"""
         meta = chunk_data.get('metadata', {})
         source = meta.get('source', 'Unknown')
         page = meta.get('page', 'N/A')
-        is_table = meta.get('is_table', False)
-        table_num = meta.get('table_number', 'N/A')
-
-        citation = f"[Source {i}: {source}, Page {page}"
-        if is_table in ('True', True):
-            citation += f", Table {table_num}"
-        citation += "]"
+        citation = f"[Source {i}: {source}, Page {page}]"
         sources_list.append(citation)
 
     try:
@@ -121,6 +104,9 @@ ANSWER:"""
         )
         response.raise_for_status()
         answer_text = response.json()["choices"][0]["message"]["content"].strip()
+
+        # إزالة أي أسطر داخلية تحتوي على "Sources" أو "📄 Sources"
+        answer_text = "\n".join([line for line in answer_text.splitlines() if "Sources" not in line and "📄" not in line])
 
         if sources_list:
             answer_text += "\n\n📄 Sources:\n" + ", ".join(sources_list)
