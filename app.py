@@ -789,97 +789,101 @@ with st.sidebar:
         for filename, info in st.session_state.files_data.items():
             st.markdown(f"""
             <div class='file-badge'>
-            {filename}
+                {filename}
             </div>
             """, unsafe_allow_html=True)
-                    st.markdown(f"""
-                    <div class='stat-card'>
-                        <p>📄 Pages: {info['total_pages']}</p>
-                        <p>📊 Tables: {info['total_tables']}</p>
-                        <p>📦 Chunks: {len(info['chunks'])}</p>
-                    </div>
-                    """, unsafe_allow_html=True)
-    else:
-        st.info("🔄 No documents processed yet")
-
-st.markdown("---")
-st.markdown("### ℹ️ About")
-st.markdown("""
-**MBE Document Assistant** helps you:
-- 🔍 Search through MBE documents
-- 💬 Ask questions in English or German
-- 📊 Extract information from tables
-- 📝 Get cited, accurate answers
-""")
-
-if st.button("🔄 Reset Chat"):
-    st.session_state.messages = []
-    st.session_state.current_context = []
-    st.rerun()
-process_documents_automatically()
-if st.session_state.processed:
-for message in st.session_state.messages:
-role_class = "user-message" if message["role"] == "user" else "assistant-message"
-header_text = "👤 YOU" if message["role"] == "user" else "🤖 ASSISTANT"
-    st.markdown(f"""
-    <div class='chat-message {role_class}'>
-        <div class='message-header'>{header_text}</div>
-        <div>{message['content']}</div>
-    </div>
-    """, unsafe_allow_html=True)
-
-if query := st.chat_input("💬 Ask a question about MBE documents..."):
-    st.session_state.messages.append({"role": "user", "content": query})
-    
-    st.markdown(f"""
-    <div class='chat-message user-message'>
-        <div class='message-header'>👤 YOU</div>
-        <div>{query}</div>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    with st.spinner("🔍 Searching documents..."):
-        try:
-            results = st.session_state.collection.query(
-                query_texts=[query],
-                n_results=10
-            )
-            
-            relevant_chunks = []
-            if results['documents'] and len(results['documents'][0]) > 0:
-                for i in range(len(results['documents'][0])):
-                    relevant_chunks.append({
-                        'content': results['documents'][0][i],
-                        'metadata': results['metadatas'][0][i]
-                    })
-            
-            answer = answer_question_with_groq(
-                query, 
-                relevant_chunks, 
-                chat_history=st.session_state.messages[:-1]
-            )
-            
-            st.session_state.messages.append({"role": "assistant", "content": answer})
             
             st.markdown(f"""
-            <div class='chat-message assistant-message'>
-                <div class='message-header'>🤖 ASSISTANT</div>
-                <div>{answer}</div>
+            <div class='stat-card'>
+                <p>📄 Pages: {info['total_pages']}</p>
+                <p>📊 Tables: {info['total_tables']}</p>
+                <p>📦 Chunks: {len(info['chunks'])}</p>
             </div>
             """, unsafe_allow_html=True)
-            
-        except Exception as e:
-            error_msg = f"❌ Error processing query: {str(e)}"
-            st.error(error_msg)
-            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+    else:
+        st.info("🔄 No documents processed yet")
     
-    st.rerun()
+    st.markdown("---")
+    st.markdown("### ℹ️ About")
+    st.markdown("""
+    **MBE Document Assistant** helps you:
+    - 🔍 Search through MBE documents
+    - 💬 Ask questions in English or German
+    - 📊 Extract information from tables
+    - 📝 Get cited, accurate answers
+    """)
+    
+    if st.button("🔄 Reset Chat"):
+        st.session_state.messages = []
+        st.session_state.current_context = []
+        st.rerun()
+
+process_documents_automatically()
+
+if st.session_state.processed:
+    for message in st.session_state.messages:
+        role_class = "user-message" if message["role"] == "user" else "assistant-message"
+        header_text = "👤 YOU" if message["role"] == "user" else "🤖 ASSISTANT"
+        
+        st.markdown(f"""
+        <div class='chat-message {role_class}'>
+            <div class='message-header'>{header_text}</div>
+            <div>{message['content']}</div>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    if query := st.chat_input("💬 Ask a question about MBE documents..."):
+        st.session_state.messages.append({"role": "user", "content": query})
+        
+        st.markdown(f"""
+        <div class='chat-message user-message'>
+            <div class='message-header'>👤 YOU</div>
+            <div>{query}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        with st.spinner("🔍 Searching documents..."):
+            try:
+                results = st.session_state.collection.query(
+                    query_texts=[query],
+                    n_results=10
+                )
+                
+                relevant_chunks = []
+                if results['documents'] and len(results['documents'][0]) > 0:
+                    for i in range(len(results['documents'][0])):
+                        relevant_chunks.append({
+                            'content': results['documents'][0][i],
+                            'metadata': results['metadatas'][0][i]
+                        })
+                
+                answer = answer_question_with_groq(
+                    query, 
+                    relevant_chunks, 
+                    chat_history=st.session_state.messages[:-1]
+                )
+                
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+                
+                st.markdown(f"""
+                <div class='chat-message assistant-message'>
+                    <div class='message-header'>🤖 ASSISTANT</div>
+                    <div>{answer}</div>
+                </div>
+                """, unsafe_allow_html=True)
+                
+            except Exception as e:
+                error_msg = f"❌ Error processing query: {str(e)}"
+                st.error(error_msg)
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
+        
+        st.rerun()
 else:
-st.info("🔄 Processing documents... Please wait.")
-st.markdown("""
-<div class='stat-card'>
-<h3>Welcome to MBE Document Assistant!</h3>
-<p>The system is automatically loading and processing your documents.</p>
-<p>This may take a moment on first load...</p>
-</div>
-""", unsafe_allow_html=True)
+    st.info("🔄 Processing documents... Please wait.")
+    st.markdown("""
+    <div class='stat-card'>
+        <h3>Welcome to MBE Document Assistant!</h3>
+        <p>The system is automatically loading and processing your documents.</p>
+        <p>This may take a moment on first load...</p>
+    </div>
+    """, unsafe_allow_html=True)
