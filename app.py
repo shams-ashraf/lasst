@@ -34,7 +34,7 @@ st.markdown("""
 
 # Sidebar for document management
 with st.sidebar:
-    st.markdown("### 🧬 BioMed Doc Chat")
+    st.markdown("#🧬 BioMed Doc Chat")
     
     available_files = get_files_from_folder()
     if not available_files:
