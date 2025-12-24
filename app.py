@@ -789,18 +789,18 @@ with st.sidebar:
         for filename, info in st.session_state.files_data.items():
             st.markdown(f"""
             <div class='file-badge'>
-{filename}
-</div>
-""", unsafe_allow_html=True)
-        st.markdown(f"""
-        <div class='stat-card'>
-            <p>📄 Pages: {info['total_pages']}</p>
-            <p>📊 Tables: {info['total_tables']}</p>
-            <p>📦 Chunks: {len(info['chunks'])}</p>
-        </div>
-        """, unsafe_allow_html=True)
-else:
-    st.info("🔄 No documents processed yet")
+            {filename}
+            </div>
+            """, unsafe_allow_html=True)
+                    st.markdown(f"""
+                    <div class='stat-card'>
+                        <p>📄 Pages: {info['total_pages']}</p>
+                        <p>📊 Tables: {info['total_tables']}</p>
+                        <p>📦 Chunks: {len(info['chunks'])}</p>
+                    </div>
+                    """, unsafe_allow_html=True)
+    else:
+        st.info("🔄 No documents processed yet")
 
 st.markdown("---")
 st.markdown("### ℹ️ About")
