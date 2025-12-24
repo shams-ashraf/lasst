@@ -12,14 +12,12 @@ import os
 import pickle
 import hashlib
 
-# Page Configuration
 st.set_page_config(
     page_title="MBE Document Assistant",
     page_icon="🎓",
     layout="wide"
 )
 
-# Modern Dark UI Styling
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -231,7 +229,6 @@ h1 {
 </style>
 """, unsafe_allow_html=True)
 
-# Initialize session state
 if 'processed' not in st.session_state:
     st.session_state.processed = False
     st.session_state.files_data = {}
@@ -240,7 +237,6 @@ if 'processed' not in st.session_state:
     st.session_state.current_context = []
     st.session_state.processing_started = False
 
-# Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = "llama-3.3-70b-versatile"
 PDF_PASSWORD = "mbe2025"
@@ -250,9 +246,7 @@ CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 os.makedirs(DOCS_FOLDER, exist_ok=True)
 os.makedirs(CACHE_FOLDER, exist_ok=True)
 
-# Helper Functions
 def get_file_hash(filepath):
-    """Calculate MD5 hash of file for caching"""
     hash_md5 = hashlib.md5()
     with open(filepath, "rb") as f:
         for chunk in iter(lambda: f.read(4096), b""):
@@ -260,7 +254,6 @@ def get_file_hash(filepath):
     return hash_md5.hexdigest()
 
 def load_cache(cache_key):
-    """Load processed data from cache"""
     cache_file = os.path.join(CACHE_FOLDER, f"{cache_key}.pkl")
     if os.path.exists(cache_file):
         try:
@@ -271,7 +264,6 @@ def load_cache(cache_key):
     return None
 
 def save_cache(cache_key, data):
-    """Save processed data to cache"""
     cache_file = os.path.join(CACHE_FOLDER, f"{cache_key}.pkl")
     try:
         with open(cache_file, 'wb') as f:
@@ -280,13 +272,11 @@ def save_cache(cache_key, data):
         st.warning(f"⚠️ Could not save cache: {str(e)}")
 
 def clean_text(text):
-    """Clean and normalize text"""
     text = re.sub(r'\s+', ' ', text)
     text = '\n'.join([line.strip() for line in text.split('\n') if line.strip()])
     return text.strip()
 
 def structure_text_into_paragraphs(text):
-    """Structure raw text into readable paragraphs"""
     if not text or not text.strip():
         return ""
    
@@ -372,7 +362,6 @@ def structure_text_into_paragraphs(text):
     return text
 
 def create_smart_chunks(text, chunk_size=1000, overlap=200, page_num=None, source_file=None, is_table=False, table_num=None):
-    """Create smart chunks with metadata for vector storage"""
     words = text.split()
     chunks = []
     
@@ -403,7 +392,6 @@ def create_smart_chunks(text, chunk_size=1000, overlap=200, page_num=None, sourc
     return chunks
 
 def format_table_as_structured_text(extracted_table, table_number=None):
-    """Format table data as structured markdown text"""
     if not extracted_table or len(extracted_table) == 0:
         return ""
    
@@ -427,7 +415,6 @@ def format_table_as_structured_text(extracted_table, table_number=None):
     return text
 
 def extract_pdf_detailed(filepath):
-    """Extract text and tables from PDF with structure preservation"""
     try:
         doc = fitz.open(filepath)
         if doc.is_encrypted:
@@ -518,7 +505,6 @@ def extract_pdf_detailed(filepath):
     return file_info, None
 
 def extract_docx_detailed(filepath):
-    """Extract text and tables from DOCX files"""
     doc = docx.Document(filepath)
     filename = os.path.basename(filepath)
     file_info = {
@@ -581,7 +567,6 @@ def extract_docx_detailed(filepath):
     return file_info, None
 
 def extract_txt_detailed(filepath):
-    """Extract text from TXT files"""
     filename = os.path.basename(filepath)
     with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
         text = f.read()
@@ -602,7 +587,6 @@ def extract_txt_detailed(filepath):
     return file_info, None
 
 def get_files_from_folder():
-    """Get all supported document files from folder"""
     supported_extensions = ['*.pdf', '*.docx', '*.doc', '*.txt']
     files = []
     for ext in supported_extensions:
@@ -610,13 +594,11 @@ def get_files_from_folder():
     return files
 
 def get_embedding_function():
-    """Get multilingual embedding function for vector storage"""
     return embedding_functions.SentenceTransformerEmbeddingFunction(
         model_name="intfloat/multilingual-e5-large"
     )
 
 def answer_question_with_groq(query, relevant_chunks, chat_history=None):
-    """Generate answer using Groq LLM with context and chat history"""
     if not GROQ_API_KEY:
         return "❌ Please set GROQ_API_KEY in environment variables"
    
@@ -721,7 +703,6 @@ ANSWER:"""
         return f"❌ Error connecting to Groq: {str(e)}"
 
 def process_documents_automatically():
-    """Auto-process documents on first load"""
     if st.session_state.processed or st.session_state.processing_started:
         return
     
@@ -762,53 +743,143 @@ def process_documents_automatically():
                 elif file_ext == 'txt':
                     file_info, error = extract_txt_detailed(filepath)
                 else:
-                    error = "Unsupported file type"
-                    file_info = None
-                  
-                    if error:
-                        st.error(f"❌ Error processing {filename}: {error}")
-                        continue
-                  
-                    # Save to cache
+                    file_info, error = None, f"❌ Unsupported file type: {file_ext}"
+               
+                if file_info and not error:
                     save_cache(cache_key, file_info)
-                    st.success(f"💾 Cached data for: {filename}")
-          
-            files_data[filename] = file_info
-          
-            # Add to collection with metadata
-            for chunk_obj in file_info['chunks']:
-                if isinstance(chunk_obj, dict):
-                    all_chunks.append(chunk_obj['content'])
-                    all_metadata.append(chunk_obj['metadata'])
-                else:
-                    all_chunks.append(chunk_obj)
-                    all_metadata.append({
-                        "source": filename,
-                        "page": "N/A",
-                        "is_table": "False",
-                        "table_number": "N/A"
-                    })
-          
-            progress_bar.progress((idx + 1) / len(available_files))
-      
-        status_text.text("Building search index...")
-      
+           
+            if error:
+                st.error(f"{filename}: {error}")
+                continue
+           
+            if file_info and len(file_info['chunks']) > 0:
+                files_data[filename] = file_info
+               
+                for chunk in file_info['chunks']:
+                    all_chunks.append(chunk['content'])
+                    all_metadata.append(chunk['metadata'])
+       
         if all_chunks:
-            batch_size = 500
-            for i in range(0, len(all_chunks), batch_size):
-                batch = all_chunks[i:i+batch_size]
-                metadata_batch = all_metadata[i:i+batch_size]
-                collection.add(
-                    documents=batch,
-                    ids=[f"chunk_{i+j}" for j in range(len(batch))],
-                    metadatas=metadata_batch
-                )
-      
-        st.session_state.files_data = files_data
-        st.session_state.collection = collection
-        st.session_state.processed = True
-        st.session_state.processing_started = False  # Reset flag
-      
-        status_text.empty()
-        st.success("✅ Processing completed successfully!")
-        st.balloons()
+            chunk_ids = [f"chunk_{uuid.uuid4().hex}" for _ in all_chunks]
+            collection.add(
+                documents=all_chunks,
+                metadatas=all_metadata,
+                ids=chunk_ids
+            )
+           
+            st.session_state.files_data = files_data
+            st.session_state.collection = collection
+            st.session_state.processed = True
+            
+            st.success(f"✅ Successfully processed {len(files_data)} documents!")
+        else:
+            st.warning("⚠️ No valid content extracted from documents")
+
+st.title("🎓 MBE Document Assistant")
+
+with st.sidebar:
+    st.markdown("### 📚 Document Information")
+    
+    if st.session_state.processed and st.session_state.files_data:
+        st.success(f"✅ **{len(st.session_state.files_data)} Documents Loaded**")
+        
+        st.markdown("---")
+        st.markdown("### 📄 Loaded Files:")
+        
+        for filename, info in st.session_state.files_data.items():
+            st.markdown(f"""
+            <div class='file-badge'>
+{filename}
+</div>
+""", unsafe_allow_html=True)
+        st.markdown(f"""
+        <div class='stat-card'>
+            <p>📄 Pages: {info['total_pages']}</p>
+            <p>📊 Tables: {info['total_tables']}</p>
+            <p>📦 Chunks: {len(info['chunks'])}</p>
+        </div>
+        """, unsafe_allow_html=True)
+else:
+    st.info("🔄 No documents processed yet")
+
+st.markdown("---")
+st.markdown("### ℹ️ About")
+st.markdown("""
+**MBE Document Assistant** helps you:
+- 🔍 Search through MBE documents
+- 💬 Ask questions in English or German
+- 📊 Extract information from tables
+- 📝 Get cited, accurate answers
+""")
+
+if st.button("🔄 Reset Chat"):
+    st.session_state.messages = []
+    st.session_state.current_context = []
+    st.rerun()
+process_documents_automatically()
+if st.session_state.processed:
+for message in st.session_state.messages:
+role_class = "user-message" if message["role"] == "user" else "assistant-message"
+header_text = "👤 YOU" if message["role"] == "user" else "🤖 ASSISTANT"
+    st.markdown(f"""
+    <div class='chat-message {role_class}'>
+        <div class='message-header'>{header_text}</div>
+        <div>{message['content']}</div>
+    </div>
+    """, unsafe_allow_html=True)
+
+if query := st.chat_input("💬 Ask a question about MBE documents..."):
+    st.session_state.messages.append({"role": "user", "content": query})
+    
+    st.markdown(f"""
+    <div class='chat-message user-message'>
+        <div class='message-header'>👤 YOU</div>
+        <div>{query}</div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.spinner("🔍 Searching documents..."):
+        try:
+            results = st.session_state.collection.query(
+                query_texts=[query],
+                n_results=10
+            )
+            
+            relevant_chunks = []
+            if results['documents'] and len(results['documents'][0]) > 0:
+                for i in range(len(results['documents'][0])):
+                    relevant_chunks.append({
+                        'content': results['documents'][0][i],
+                        'metadata': results['metadatas'][0][i]
+                    })
+            
+            answer = answer_question_with_groq(
+                query, 
+                relevant_chunks, 
+                chat_history=st.session_state.messages[:-1]
+            )
+            
+            st.session_state.messages.append({"role": "assistant", "content": answer})
+            
+            st.markdown(f"""
+            <div class='chat-message assistant-message'>
+                <div class='message-header'>🤖 ASSISTANT</div>
+                <div>{answer}</div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+        except Exception as e:
+            error_msg = f"❌ Error processing query: {str(e)}"
+            st.error(error_msg)
+            st.session_state.messages.append({"role": "assistant", "content": error_msg})
+    
+    st.rerun()
+else:
+st.info("🔄 Processing documents... Please wait.")
+st.markdown("""
+<div class='stat-card'>
+<h3>Welcome to MBE Document Assistant!</h3>
+<p>The system is automatically loading and processing your documents.</p>
+<p>This may take a moment on first load...</p>
+</div>
+""", unsafe_allow_html=True)
