@@ -37,39 +37,37 @@ def build_conversational_prompt(query, chat_history):
 def answer_question_with_groq(query, relevant_chunks, chat_history=None):
     if not GROQ_API_KEY:
         return "❌ Please set GROQ_API_KEY in environment variables"
-   
+  
     context_parts = [chunk['content'] for chunk in relevant_chunks[:10]]
     context = "\n\n---\n\n".join(context_parts)
-
+    
     conversation_summary = ""
     if chat_history and len(chat_history) > 0:
-        recent = chat_history[-6:]  
+        recent = chat_history[-6:]
         conv_lines = []
         for msg in recent:
             role = "User" if msg['role'] == 'user' else "Assistant"
             content_preview = msg['content'][:300]
             conv_lines.append(f"{role}: {content_preview}")
         conversation_summary = "\n".join(conv_lines)
-
+    
     data = {
         "model": GROQ_MODEL,
         "messages": [
             {
                 "role": "system",
                 "content": """You are a precise MBE Document Assistant at Hochschule Anhalt specializing in Biomedical Engineering regulations.
-
 CRITICAL RULES:
 1. Answer ONLY from provided sources OR previous conversation if it's a follow-up question.
-2. ALWAYS cite sources.
-3. Use the SAME language as the question (English/German/Arabic)
-4. Be concise, short, direct answers unless asked to elaborate
-5. For counting questions: Count precisely and list all items with citations
-6. Do NOT explain your thought process
-7. Append all relevant sources ONLY at the END of the answer"""
+2. Use the SAME language as the question (English/German/Arabic).
+3. Be concise, short, and direct unless asked to elaborate.
+4. For counting questions: Count precisely and list all items.
+5. Do NOT explain your thought process.
+6. Do NOT mention sources, pages, citations, or references in your answer at all."""
             },
             {
                 "role": "user",
-                "content": f"""CONVERSATION HISTORY (use for follow-up questions):
+                "content": f"""CONVERSATION HISTORY (use only for follow-up questions):
 {conversation_summary if conversation_summary else "No previous conversation"}
 
 DOCUMENT SOURCES (use for new factual questions):
@@ -83,15 +81,9 @@ ANSWER:"""
         "temperature": 0.1,
         "max_tokens": 2000,
     }
-
-    sources_list = []
-    for i, chunk_data in enumerate(relevant_chunks[:10], 1):
-        meta = chunk_data.get('metadata', {})
-        source = meta.get('source', 'Unknown')
-        page = meta.get('page', 'N/A')
-        citation = f"[Source {i}: {source}, Page {page}]"
-        sources_list.append(citation)
-
+    
+    # ⚠️ حذفنا كل حاجة متعلقة بـ sources_list و citation building
+    
     try:
         response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -104,13 +96,13 @@ ANSWER:"""
         )
         response.raise_for_status()
         answer_text = response.json()["choices"][0]["message"]["content"].strip()
-
-        # إزالة أي أسطر داخلية تحتوي على "Sources" أو "📄 Sources"
-        answer_text = "\n".join([line for line in answer_text.splitlines() if "Sources" not in line and "📄" not in line])
-
-        if sources_list:
-            answer_text += "\n\n📄 Sources:\n" + ", ".join(sources_list)
-
+        
+        # تنظيف إضافي لو الـ LLM حاول يكتب sources برضه (safety net)
+        lines = answer_text.splitlines()
+        cleaned_lines = [line for line in lines if not any(keyword in line.lower() for keyword in ["source", "quelle", "مصدر", "page", "seite", "صفحة", "citation", "📄"])]
+        answer_text = "\n".join(cleaned_lines).strip()
+        
         return answer_text
+    
     except Exception as e:
         return f"❌ Error connecting to Groq: {str(e)}"
