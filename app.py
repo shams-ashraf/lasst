@@ -240,7 +240,7 @@ if 'processed' not in st.session_state:
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = "llama-3.3-70b-versatile"
 PDF_PASSWORD = "mbe2025"
-DOCS_FOLDER = "/mount/src/test/documents"
+DOCS_FOLDER = "/mount/src/lasst/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
