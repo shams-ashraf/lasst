@@ -18,7 +18,7 @@ if 'processed' not in st.session_state:
 # Configuration
 
 PDF_PASSWORD = "mbe2025"
-DOCS_FOLDER = "/mount/src/test/documents"
+DOCS_FOLDER = "/mount/src/lasst/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
