@@ -1,0 +1,12 @@
+streamlit
+PyMuPDF
+sentence-transformers
+chromadb
+requests
+langdetect
+python-docx
+pytesseract
+Pillow
+patool
+py7zr
+opencv-python-headless==4.8.1.78
