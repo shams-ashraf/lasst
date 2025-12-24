@@ -104,7 +104,6 @@ Instructions:
 - If this is a follow-up (summarize/elaborate/that/it), answer from conversation history
 - If this is a new question, answer from sources
 - Do NOT include your thought process
-- Append all relevant sources ONLY at the END of the answer
 
 ANSWER:"""
             }
@@ -129,4 +128,5 @@ ANSWER:"""
         return answer_text
     except Exception as e:
         return f"❌ Error connecting to Groq: {str(e)}"
+
 
