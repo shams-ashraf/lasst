@@ -761,4 +761,4 @@ def process_documents_automatically():
                     file_info, error = extract_docx_detailed(filepath)
                 elif file_ext == 'txt':
                     file_info, error = extract_txt_detailed(filepath)
-                else
+                else :
