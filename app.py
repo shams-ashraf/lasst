@@ -3,6 +3,7 @@ import uuid
 import chromadb
 import os
 from styles import load_custom_css
+
 from DocumentProcessor import (
     get_files_from_folder,
     get_file_hash,
@@ -23,11 +24,9 @@ st.set_page_config(
 
 load_custom_css()
 
-DOCS_FOLDER = "/mount/src/test/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 CHROMA_FOLDER = "./chroma_db"
 
-os.makedirs(DOCS_FOLDER, exist_ok=True)
 os.makedirs(CACHE_FOLDER, exist_ok=True)
 os.makedirs(CHROMA_FOLDER, exist_ok=True)
 
