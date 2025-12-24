@@ -16,30 +16,51 @@ def get_embedding_function():
     )
 
 def build_conversational_prompt(query, chat_history):
+    """Build context-aware prompt with chat history"""
     if not chat_history:
         return query
-    recent_history = chat_history[-6:]
+    
+    recent_history = chat_history[-6:]  
     context_lines = []
+    
     for msg in recent_history:
         role = msg['role']
-        content = msg['content'][:200]
+        content = msg['content'][:200]  
         if role == 'user':
             context_lines.append(f"Previous Q: {content}")
         else:
             context_lines.append(f"Previous A: {content}")
+    
     history_context = "\n".join(context_lines)
     return f"Conversation context:\n{history_context}\n\nCurrent question: {query}"
-
 def answer_question_with_groq(query, relevant_chunks, chat_history=None):
     if not GROQ_API_KEY:
         return "❌ Please set GROQ_API_KEY in environment variables"
    
-    context_parts = [chunk_data['content'] for chunk_data in relevant_chunks[:10]]
+    context_parts = []
+    sources_list = []  
+    for i, chunk_data in enumerate(relevant_chunks[:10], 1):
+        content = chunk_data['content']
+        meta = chunk_data['metadata']
+        
+        source = meta.get('source', 'Unknown')
+        page = meta.get('page', 'N/A')
+        is_table = meta.get('is_table', 'False')
+        table_num = meta.get('table_number', 'N/A')
+        
+        citation = f"[Source {i}: {source}, Page {page}"
+        if is_table == 'True' or is_table == True:
+            citation += f", Table {table_num}"
+        citation += "]"
+        
+        context_parts.append(content)
+        sources_list.append(citation)
+    
     context = "\n\n---\n\n".join(context_parts)
     
     conversation_summary = ""
     if chat_history and len(chat_history) > 0:
-        recent = chat_history[-6:]
+        recent = chat_history[-6:]  
         conv_lines = []
         for msg in recent:
             role = "User" if msg['role'] == 'user' else "Assistant"
@@ -55,21 +76,37 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
                 "content": """You are a precise MBE Document Assistant at Hochschule Anhalt specializing in Biomedical Engineering regulations.
 
 CRITICAL RULES:
-- Answer based only on provided content or previous conversation
-- Ignore source citations in answers
-- Use conversation history for follow-ups
-- Use same language as question
-- Be concise"""
+1. Answer ONLY from provided sources OR previous conversation if it's a follow-up question.
+2. ALWAYS cite sources .
+3. For follow-up questions like "summarize", "tell me more", "explain that", or "what about that":
+   - Check the conversation history FIRST
+   - Summarize or expand on your PREVIOUS answer
+4. If user says "summarize that" or "summarize it": Condense your LAST answer (from conversation history)
+5. If no relevant info in sources OR history: "No sufficient information in the available documents"
+6. Use the SAME language as the question (English/German/Arabic)
+7. Be CONCISE - short, direct answers unless asked to elaborate
+8. For counting questions: Count precisely and list all items with citations
+9. Do NOT explain your thought process.
+10. Answer directly and clearly.
+11. Append all relevant sources ONLY at the END of the answer, not within the text.
+
+Remember: You're helping MBE students understand their program requirements clearly and accurately."""
             },
             {
                 "role": "user",
-                "content": f"""CONVERSATION HISTORY (for follow-ups):
+                "content": f"""CONVERSATION HISTORY (use for follow-up questions):
 {conversation_summary if conversation_summary else "No previous conversation"}
 
-DOCUMENT CONTENT:
+DOCUMENT SOURCES (use for new factual questions):
 {context}
 
 CURRENT QUESTION: {query}
+
+Instructions: 
+- If this is a follow-up (summarize/elaborate/that/it), answer from conversation history
+- If this is a new question, answer from sources
+- Do NOT include your thought process
+- Append all relevant sources ONLY at the END of the answer
 
 ANSWER:"""
             }
@@ -89,6 +126,8 @@ ANSWER:"""
             timeout=60
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"]
+        answer_text = response.json()["choices"][0]["message"]["content"]
+
+        return answer_text
     except Exception as e:
         return f"❌ Error connecting to Groq: {str(e)}"
