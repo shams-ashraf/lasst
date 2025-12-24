@@ -13,34 +13,14 @@ import pickle
 import hashlib
 from styles import load_custom_css
 
-st.set_page_config(
-    page_title="BioMed Doc Chat",
-    page_icon="🧬",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-load_custom_css()
 
 if 'processed' not in st.session_state:
     st.session_state.processed = False
     st.session_state.files_data = {}
     st.session_state.collection = None
+    st.session_state.messages = []
+    st.session_state.current_context = []
     st.session_state.processing_started = False
-
-if 'chat_sessions' not in st.session_state:
-    st.session_state.chat_sessions = {}
-    st.session_state.current_chat_id = None
-    st.session_state.next_chat_number = 1
-
-if st.session_state.current_chat_id is None:
-    chat_id = f"chat_{st.session_state.next_chat_number}"
-    st.session_state.chat_sessions[chat_id] = {
-        'messages': [],
-        'name': f"Chat {st.session_state.next_chat_number}"
-    }
-    st.session_state.current_chat_id = chat_id
-    st.session_state.next_chat_number += 1
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -74,7 +54,7 @@ def save_cache(cache_key, data):
         with open(cache_file, 'wb') as f:
             pickle.dump(data, f)
     except Exception as e:
-        pass
+        st.warning(f"⚠️ Could not save cache: {str(e)}")
 
 def clean_text(text):
     text = re.sub(r'\s+', ' ', text)
@@ -515,158 +495,130 @@ def process_documents_automatically():
     
     available_files = get_files_from_folder()
     if not available_files:
-        st.session_state.processed = True
         return
     
-    files_data = {}
-    all_chunks = []
-    all_metadata = []
-    
-    client = chromadb.Client()
-    collection_name = f"docs_{uuid.uuid4().hex[:8]}"
-    collection = client.create_collection(
-        name=collection_name,
-        embedding_function=get_embedding_function()
-    )
+    with st.spinner("🔄 Processing documents automatically..."):
+        files_data = {}
+        all_chunks = []
+        all_metadata = []
        
-    for filepath in available_files:
-        filename = os.path.basename(filepath)
-        file_ext = filename.split('.')[-1].lower()
-        
-        file_hash = get_file_hash(filepath)
-        cache_key = f"{file_hash}_{file_ext}"
-        cached_data = load_cache(cache_key)
-        
-        if cached_data:
-            file_info = cached_data
-            error = None
-        else:
-            if file_ext == 'pdf':
-                file_info, error = extract_pdf_detailed(filepath)
-            elif file_ext in ['docx', 'doc']:
-                file_info, error = extract_docx_detailed(filepath)
-            elif file_ext == 'txt':
-                file_info, error = extract_txt_detailed(filepath)
-            else:
-                file_info, error = None, f"❌ Unsupported file type: {file_ext}"
-            
-            if file_info and not error:
-                save_cache(cache_key, file_info)
-        
-        if error:
-            continue
-        
-        if file_info and len(file_info['chunks']) > 0:
-            files_data[filename] = file_info
-            
-            for chunk in file_info['chunks']:
-                all_chunks.append(chunk['content'])
-                all_metadata.append(chunk['metadata'])
-    
-    if all_chunks:
-        chunk_ids = [f"chunk_{uuid.uuid4().hex}" for _ in all_chunks]
-        collection.add(
-            documents=all_chunks,
-            metadatas=all_metadata,
-            ids=chunk_ids
+        client = chromadb.Client()
+        collection_name = f"docs_{uuid.uuid4().hex[:8]}"
+        collection = client.create_collection(
+            name=collection_name,
+            embedding_function=get_embedding_function()
         )
-        
-        st.session_state.files_data = files_data
-        st.session_state.collection = collection
-        st.session_state.processed = True
-    else:
-        st.session_state.processed = True
+       
+        for filepath in available_files:
+            filename = os.path.basename(filepath)
+            file_ext = filename.split('.')[-1].lower()
+           
+            file_hash = get_file_hash(filepath)
+            cache_key = f"{file_hash}_{file_ext}"
+            cached_data = load_cache(cache_key)
+           
+            if cached_data:
+                file_info = cached_data
+                error = None
+            else:
+                if file_ext == 'pdf':
+                    file_info, error = extract_pdf_detailed(filepath)
+                elif file_ext in ['docx', 'doc']:
+                    file_info, error = extract_docx_detailed(filepath)
+                elif file_ext == 'txt':
+                    file_info, error = extract_txt_detailed(filepath)
+                else:
+                    file_info, error = None, f"❌ Unsupported file type: {file_ext}"
+               
+                if file_info and not error:
+                    save_cache(cache_key, file_info)
+           
+            if error:
+                st.error(f"{filename}: {error}")
+                continue
+           
+            if file_info and len(file_info['chunks']) > 0:
+                files_data[filename] = file_info
+               
+                for chunk in file_info['chunks']:
+                    all_chunks.append(chunk['content'])
+                    all_metadata.append(chunk['metadata'])
+       
+        if all_chunks:
+            chunk_ids = [f"chunk_{uuid.uuid4().hex}" for _ in all_chunks]
+            collection.add(
+                documents=all_chunks,
+                metadatas=all_metadata,
+                ids=chunk_ids
+            )
+           
+            st.session_state.files_data = files_data
+            st.session_state.collection = collection
+            st.session_state.processed = True
+            
+            st.success(f"✅ Successfully processed {len(files_data)} documents!")
+        else:
+            st.warning("⚠️ No valid content extracted from documents")
 
-st.markdown("""
-<div style='text-align: center; margin-bottom: 30px;'>
-    <h1 style='color: #00d4ff; font-size: 3em; margin: 0;'>
-        🧬 Biomedical Document Chatbot
-    </h1>
-</div>
-""", unsafe_allow_html=True)
-
-process_documents_automatically()
+st.title("🎓 MBE Document Assistant")
 
 with st.sidebar:
-    st.markdown("""
-    <div style='text-align: center; padding: 20px 0;'>
-        <div style='font-size: 4em;'>🧬</div>
-        <h2 style='color: #00d4ff; margin: 10px 0;'>BioMed<br>Doc Chat</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if st.button("➕ New Chat", use_container_width=True, key="new_chat_btn"):
-        chat_id = f"chat_{st.session_state.next_chat_number}"
-        st.session_state.chat_sessions[chat_id] = {
-            'messages': [],
-            'name': f"Chat {st.session_state.next_chat_number}"
-        }
-        st.session_state.current_chat_id = chat_id
-        st.session_state.next_chat_number += 1
-        st.rerun()
-    
-    st.markdown("---")
-    
-    st.markdown("### 💬 Chat History")
-    
-    for chat_id in list(st.session_state.chat_sessions.keys()):
-        chat_name = st.session_state.chat_sessions[chat_id]['name']
-        msg_count = len(st.session_state.chat_sessions[chat_id]['messages'])
-        
-        if msg_count > 0:
-            first_msg = st.session_state.chat_sessions[chat_id]['messages'][0]['content']
-            preview = first_msg[:50] + "..." if len(first_msg) > 50 else first_msg
-        else:
-            preview = "New conversation"
-        
-        if st.button(
-            f"💬 {preview}",
-            key=f"chat_{chat_id}",
-            use_container_width=True,
-            disabled=(chat_id == st.session_state.current_chat_id)
-        ):
-            st.session_state.current_chat_id = chat_id
-            st.rerun()
-    
-    st.markdown("---")
     st.markdown("### 📚 Document Information")
     
     if st.session_state.processed and st.session_state.files_data:
-        with st.expander("📄 About This Chatbot", expanded=False):
+        st.success(f"✅ **{len(st.session_state.files_data)} Documents Loaded**")
+        
+        st.markdown("---")
+        st.markdown("### 📄 Loaded Files:")
+        
+        for filename, info in st.session_state.files_data.items():
             st.markdown(f"""
-            **Documents Loaded:** {len(st.session_state.files_data)}
+            <div class='file-badge'>
+                {filename}
+            </div>
+            """, unsafe_allow_html=True)
             
-            **Capabilities:**
-            - 🔍 Search through MBE documents
-            - 💬 Ask questions in English or German
-            - 📊 Extract information from tables
-            - 📝 Get cited, accurate answers
-            """)
-            
-            for filename, info in st.session_state.files_data.items():
-                st.markdown(f"**{filename}**")
-                st.text(f"📄 Pages: {info['total_pages']} | 📊 Tables: {info['total_tables']} | 📦 Chunks: {len(info['chunks'])}")
+            st.markdown(f"""
+            <div class='stat-card'>
+                <p>📄 Pages: {info['total_pages']}</p>
+                <p>📊 Tables: {info['total_tables']}</p>
+                <p>📦 Chunks: {len(info['chunks'])}</p>
+            </div>
+            """, unsafe_allow_html=True)
     else:
-        with st.expander("📄 About This Chatbot", expanded=False):
-            st.info("No documents loaded yet")
+        st.info("🔄 No documents processed yet")
+    
+    st.markdown("---")
+    st.markdown("### ℹ️ About")
+    st.markdown("""
+    **MBE Document Assistant** helps you:
+    - 🔍 Search through MBE documents
+    - 💬 Ask questions in English or German
+    - 📊 Extract information from tables
+    - 📝 Get cited, accurate answers
+    """)
+    
+    if st.button("🔄 Reset Chat"):
+        st.session_state.messages = []
+        st.session_state.current_context = []
+        st.rerun()
 
-current_messages = st.session_state.chat_sessions[st.session_state.current_chat_id]['messages']
+process_documents_automatically()
 
 if st.session_state.processed:
-    for message in current_messages:
+    for message in st.session_state.messages:
         role_class = "user-message" if message["role"] == "user" else "assistant-message"
-        icon = "👤" if message["role"] == "user" else "🤖"
-        header = "YOU" if message["role"] == "user" else "ASSISTANT"
+        header_text = "👤 YOU" if message["role"] == "user" else "🤖 ASSISTANT"
         
         st.markdown(f"""
         <div class='chat-message {role_class}'>
-            <div class='message-header'>{icon} {header}</div>
+            <div class='message-header'>{header_text}</div>
             <div>{message['content']}</div>
         </div>
         """, unsafe_allow_html=True)
     
-    if query := st.chat_input("Ask your question here..."):
-        current_messages.append({"role": "user", "content": query})
+    if query := st.chat_input("💬 Ask a question about MBE documents..."):
+        st.session_state.messages.append({"role": "user", "content": query})
         
         st.markdown(f"""
         <div class='chat-message user-message'>
@@ -693,10 +645,10 @@ if st.session_state.processed:
                 answer = answer_question_with_groq(
                     query, 
                     relevant_chunks, 
-                    chat_history=current_messages[:-1]
+                    chat_history=st.session_state.messages[:-1]
                 )
                 
-                current_messages.append({"role": "assistant", "content": answer})
+                st.session_state.messages.append({"role": "assistant", "content": answer})
                 
                 st.markdown(f"""
                 <div class='chat-message assistant-message'>
@@ -708,13 +660,15 @@ if st.session_state.processed:
             except Exception as e:
                 error_msg = f"❌ Error processing query: {str(e)}"
                 st.error(error_msg)
-                current_messages.append({"role": "assistant", "content": error_msg})
+                st.session_state.messages.append({"role": "assistant", "content": error_msg})
         
         st.rerun()
 else:
+    st.info("🔄 Processing documents... Please wait.")
     st.markdown("""
-    <div style='text-align: center; padding: 50px;'>
-        <h3>🔄 Loading system...</h3>
-        <p>Please wait a moment while the assistant initializes.</p>
+    <div class='stat-card'>
+        <h3>Welcome to MBE Document Assistant!</h3>
+        <p>The system is automatically loading and processing your documents.</p>
+        <p>This may take a moment on first load...</p>
     </div>
     """, unsafe_allow_html=True)
