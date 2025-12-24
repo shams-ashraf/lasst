@@ -761,4 +761,54 @@ def process_documents_automatically():
                     file_info, error = extract_docx_detailed(filepath)
                 elif file_ext == 'txt':
                     file_info, error = extract_txt_detailed(filepath)
-                else :
+                else:
+                    error = "Unsupported file type"
+                    file_info = None
+                  
+                    if error:
+                        st.error(f"❌ Error processing {filename}: {error}")
+                        continue
+                  
+                    # Save to cache
+                    save_cache(cache_key, file_info)
+                    st.success(f"💾 Cached data for: {filename}")
+          
+            files_data[filename] = file_info
+          
+            # Add to collection with metadata
+            for chunk_obj in file_info['chunks']:
+                if isinstance(chunk_obj, dict):
+                    all_chunks.append(chunk_obj['content'])
+                    all_metadata.append(chunk_obj['metadata'])
+                else:
+                    all_chunks.append(chunk_obj)
+                    all_metadata.append({
+                        "source": filename,
+                        "page": "N/A",
+                        "is_table": "False",
+                        "table_number": "N/A"
+                    })
+          
+            progress_bar.progress((idx + 1) / len(available_files))
+      
+        status_text.text("Building search index...")
+      
+        if all_chunks:
+            batch_size = 500
+            for i in range(0, len(all_chunks), batch_size):
+                batch = all_chunks[i:i+batch_size]
+                metadata_batch = all_metadata[i:i+batch_size]
+                collection.add(
+                    documents=batch,
+                    ids=[f"chunk_{i+j}" for j in range(len(batch))],
+                    metadatas=metadata_batch
+                )
+      
+        st.session_state.files_data = files_data
+        st.session_state.collection = collection
+        st.session_state.processed = True
+        st.session_state.processing_started = False  # Reset flag
+      
+        status_text.empty()
+        st.success("✅ Processing completed successfully!")
+        st.balloons()
