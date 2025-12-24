@@ -165,7 +165,7 @@ with st.sidebar:
         }
         st.session_state.active_chat = cid
         st.rerun()
-
+    st.markdown("### 💬 Chats")
     for cid in list(st.session_state.chats.keys()):
         col1, col2 = st.columns([5, 1])
         with col1:
@@ -178,7 +178,6 @@ with st.sidebar:
                 if st.session_state.active_chat == cid:
                     st.session_state.active_chat = None
                 st.rerun()
-    st.markdown("### 💬 Chats")
 chat = st.session_state.chats[st.session_state.active_chat]
 messages = chat["messages"]
 
