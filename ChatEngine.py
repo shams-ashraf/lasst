@@ -88,7 +88,6 @@ CRITICAL RULES:
 8. For counting questions: Count precisely and list all items with citations
 9. Do NOT explain your thought process.
 10. Answer directly and clearly.
-11. Append all relevant sources ONLY at the END of the answer, not within the text.
 
 Remember: You're helping MBE students understand their program requirements clearly and accurately."""
             },
