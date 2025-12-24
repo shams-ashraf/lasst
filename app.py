@@ -19,9 +19,7 @@ import hashlib
 from styles import load_custom_css
 
 
-# Initialize session state
 if 'chats' not in st.session_state:
-    # Create initial default chat
     st.session_state.chats = {
         'default': {
             'messages': [],
@@ -37,7 +35,6 @@ if 'processed' not in st.session_state:
     st.session_state.collection = None
     st.session_state.chat_counter = 1
 
-# Configuration
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = "llama-3.3-70b-versatile"
 PDF_PASSWORD = "mbe2025"
@@ -50,7 +47,6 @@ os.makedirs(CACHE_FOLDER, exist_ok=True)
 if not GROQ_API_KEY:
     st.error("⚠️ GROQ_API_KEY not found in environment variables!")
 
-# Helper Functions
 def get_file_hash(filepath):
     hash_md5 = hashlib.md5()
     with open(filepath, "rb") as f:
@@ -417,7 +413,6 @@ def get_embedding_function():
     )
 
 def process_documents():
-    """Auto-process documents on startup"""
     available_files = get_files_from_folder()
     
     if not available_files:
@@ -588,7 +583,6 @@ ANSWER:"""
     except Exception as e:
         return f"❌ Error connecting to Groq: {str(e)}"
 
-# Auto-process documents on first load
 if not st.session_state.processed:
     with st.spinner("🚀 Loading documents..."):
         success, result = process_documents()
@@ -597,7 +591,6 @@ if not st.session_state.processed:
         else:
             st.warning(f"⚠️ {result}")
 
-# Main UI
 st.markdown("""
 <div style='text-align: center; padding: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 10px; margin-bottom: 2rem;'>
     <h1 style='color: white; margin: 0;'>🎓 MBE Document Assistant</h1>
@@ -605,27 +598,22 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar for chat management
 with st.sidebar:
     st.markdown("### 💬 Chat Sessions")
     
-    # New Chat button
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        if st.button("➕ New Chat", use_container_width=True, type="primary"):
-            st.session_state.chat_counter += 1
-            new_chat_id = f"chat_{uuid.uuid4().hex[:8]}"
-            st.session_state.chats[new_chat_id] = {
-                'messages': [],
-                'current_context': [],
-                'name': f'Chat {st.session_state.chat_counter}'
-            }
-            st.session_state.active_chat = new_chat_id
-            st.rerun()
+    if st.button("➕ New Chat", use_container_width=True, type="primary"):
+        st.session_state.chat_counter += 1
+        new_chat_id = f"chat_{uuid.uuid4().hex[:8]}"
+        st.session_state.chats[new_chat_id] = {
+            'messages': [],
+            'current_context': [],
+            'name': f'Chat {st.session_state.chat_counter}'
+        }
+        st.session_state.active_chat = new_chat_id
+        st.rerun()
     
     st.markdown("---")
     
-    # List all chats
     for chat_id, chat_data in list(st.session_state.chats.items()):
         col1, col2 = st.columns([4, 1])
         
@@ -653,7 +641,6 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # Clear cache button
     if st.button("🗑️ Clear Cache & Reload", use_container_width=True):
         import shutil
         if os.path.exists(CACHE_FOLDER):
@@ -665,13 +652,11 @@ with st.sidebar:
         st.success("✅ Cache cleared! Reloading...")
         st.rerun()
 
-# Main chat interface
 if st.session_state.processed and st.session_state.active_chat in st.session_state.chats:
     current_chat = st.session_state.chats[st.session_state.active_chat]
     
     st.markdown(f"### 💬 {current_chat['name']}")
     
-    # Display chat history
     for message in current_chat['messages']:
         role = message["role"]
         content = message["content"]
@@ -681,21 +666,17 @@ if st.session_state.processed and st.session_state.active_chat in st.session_sta
         else:
             st.markdown(f'<div class="chat-message assistant-message">🤖 <strong>Assistant:</strong> {content}</div>', unsafe_allow_html=True)
     
-    # Chat input
     query = st.chat_input("Ask anything about your documents...")
     
     if query:
-        # Add user message
         current_chat['messages'].append({"role": "user", "content": query})
         
         with st.spinner("Thinking..."):
-            # Search with metadata
             results = st.session_state.collection.query(
                 query_texts=[query],
                 n_results=10
             )
             
-            # Build chunk objects with metadata
             relevant_chunks = []
             for content, metadata in zip(results["documents"][0], results["metadatas"][0]):
                 relevant_chunks.append({
@@ -703,18 +684,14 @@ if st.session_state.processed and st.session_state.active_chat in st.session_sta
                     'metadata': metadata
                 })
             
-            # Generate answer with chat history
             answer = answer_question_with_groq(query, relevant_chunks, current_chat['messages'])
             
-            # Add assistant message
             current_chat['messages'].append({"role": "assistant", "content": answer})
             
-            # Store context for follow-ups
             current_chat['current_context'] = relevant_chunks
         
         st.rerun()
     
-    # Show sources in expander
     if current_chat['current_context']:
         with st.expander("📄 View Sources", expanded=False):
             for idx, chunk_data in enumerate(current_chat['current_context'][:5], 1):
@@ -734,24 +711,7 @@ if st.session_state.processed and st.session_state.active_chat in st.session_sta
 
 else:
     st.info("📁 Documents are loading or not found. Please check the documents folder.")
-# Sidebar for chat management
-with st.sidebar:
-    st.markdown("### 💬 Chat Sessions")
-    
-    # New Chat button
-    if st.button("➕ New Chat", use_container_width=True, type="primary"):
-        st.session_state.chat_counter += 1
-        new_chat_id = f"chat_{uuid.uuid4().hex[:8]}"
-        st.session_state.chats[new_chat_id] = {
-            'messages': [],
-            'current_context': [],
-            'name': f'Chat {st.session_state.chat_counter}'
-        }
-        st.session_state.active_chat = new_chat_id
-        st.rerun()
-    
-    st.markdown("---")
-# Footer with info
+
 st.markdown("""
 ---
 ### 🎯 Features:
@@ -773,3 +733,4 @@ st.markdown("""
     - "Tell me about the internship" → then "summarize that"
     - "Compare exam types in SPO"
     """)
+
