@@ -2,8 +2,8 @@
 MBE Document Assistant - Main Entry Point
 """
 import os
-from DocumentProcessor import DocumentProcessor
-from ChatEngine import ChatEngine
+from DocumentProcessor import Processor
+from ChatEngine import Chat
 from ui_manager import UIManager
 
 class MBEAssistant:
@@ -23,8 +23,8 @@ class MBEAssistant:
         os.makedirs(self.config['cache_folder'], exist_ok=True)
         
         # Initialize components
-        self.doc_processor = DocumentProcessor(self.config)
-        self.chat_engine = ChatEngine(self.config)
+        self.doc_processor = Processor(self.config)
+        self.chat_engine = Chat(self.config)
         self.ui_manager = UIManager(self.doc_processor, self.chat_engine)
     
     def run(self):
