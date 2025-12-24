@@ -40,7 +40,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 with st.sidebar:
-    st.markdown("#🧬 BioMed Doc Chat")
+    st.markdown("# 🧬 BioMed Doc Chat")
 
     files = get_files_from_folder()
     if not files:
