@@ -215,13 +215,3 @@ if query:
     chat["context"] = chunks
 
     st.rerun()
-
-if chat["context"]:
-    with st.expander("📄 Sources"):
-        for i, c in enumerate(chat["context"][:5], 1):
-            meta = c["metadata"]
-            line = f"📄 Source {i}: {meta.get('source','Unknown')} | Page {meta.get('page','N/A')}"
-            if meta.get("is_table") in [True, "True"]:
-                line += f" | Table {meta.get('table_number','N/A')}"
-            st.markdown(line)
-            st.markdown(f"<div class='chunk-display'>{c['content'][:500]}...</div>", unsafe_allow_html=True)
