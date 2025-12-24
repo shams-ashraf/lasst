@@ -163,7 +163,7 @@ with st.sidebar:
         }
         st.session_state.active_chat = cid
         st.rerun()
-     st.markdown("---")
+    st.markdown("---")
     st.markdown("### 💬 Chats")
     for cid in list(st.session_state.chats.keys()):
         col1, col2 = st.columns([5, 1])
