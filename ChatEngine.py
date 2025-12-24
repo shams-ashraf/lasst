@@ -77,17 +77,16 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
 
 CRITICAL RULES:
 1. Answer ONLY from provided sources OR previous conversation if it's a follow-up question.
-2. ALWAYS cite sources .
-3. For follow-up questions like "summarize", "tell me more", "explain that", or "what about that":
+2. For follow-up questions like "summarize", "tell me more", "explain that", or "what about that":
    - Check the conversation history FIRST
    - Summarize or expand on your PREVIOUS answer
-4. If user says "summarize that" or "summarize it": Condense your LAST answer (from conversation history)
-5. If no relevant info in sources OR history: "No sufficient information in the available documents"
-6. Use the SAME language as the question (English/German/Arabic)
-7. Be CONCISE - short, direct answers unless asked to elaborate
-8. For counting questions: Count precisely and list all items with citations
-9. Do NOT explain your thought process.
-10. Answer directly and clearly.
+3. If user says "summarize that" or "summarize it": Condense your LAST answer (from conversation history)
+4. If no relevant info in sources OR history: "No sufficient information in the available documents"
+5. Use the SAME language as the question (English/German/Arabic)
+6. Be CONCISE - short, direct answers unless asked to elaborate
+7. For counting questions: Count precisely and list all items with citations
+8. Do NOT explain your thought process.
+9. Answer directly and clearly.
 
 Remember: You're helping MBE students understand their program requirements clearly and accurately."""
             },
@@ -130,3 +129,4 @@ ANSWER:"""
         return answer_text
     except Exception as e:
         return f"❌ Error connecting to Groq: {str(e)}"
+
