@@ -188,8 +188,6 @@ with st.sidebar:
 chat = st.session_state.chats[st.session_state.active_chat]
 messages = chat["messages"]
 
-st.markdown("### 💬 Chat")
-
 for m in messages:
     if m["role"] == "user":
         st.markdown(f"<div class='chat-message user-message'>👤 {m['content']}</div>", unsafe_allow_html=True)
