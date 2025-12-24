@@ -1,40 +1,3 @@
-import streamlit as st
-from sentence_transformers import SentenceTransformer
-import chromadb
-from chromadb.utils import embedding_functions
-import requests
-import os
-
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = "llama-3.3-70b-versatile"
-if not GROQ_API_KEY:
-    st.error("⚠️ GROQ_API_KEY not found in environment variables!")
-
-def get_embedding_function():
-    return embedding_functions.SentenceTransformerEmbeddingFunction(
-        model_name="intfloat/multilingual-e5-large"
-    )
-
-def build_conversational_prompt(query, chat_history):
-    """Build context-aware prompt with chat history"""
-    if not chat_history:
-        return query
-    
-    # Last 3 exchanges for context
-    recent_history = chat_history[-6:]  # 3 Q&A pairs
-    context_lines = []
-    
-    for msg in recent_history:
-        role = msg['role']
-        content = msg['content'][:200]  # Limit length
-        if role == 'user':
-            context_lines.append(f"Previous Q: {content}")
-        else:
-            context_lines.append(f"Previous A: {content}")
-    
-    history_context = "\n".join(context_lines)
-    return f"Conversation context:\n{history_context}\n\nCurrent question: {query}"
-
 def answer_question_with_groq(query, relevant_chunks, chat_history=None):
     if not GROQ_API_KEY:
         return "❌ Please set GROQ_API_KEY in environment variables"
@@ -79,21 +42,19 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
                 "content": """You are a precise MBE Document Assistant at Hochschule Anhalt specializing in Biomedical Engineering regulations.
 
 CRITICAL RULES:
-1. Answer ONLY from provided sources OR previous conversation if it's a follow-up question
-2. ALWAYS cite sources: [Source X, Page Y] or [Source X, Page Y, Table Z]
+1. Answer ONLY from provided sources OR previous conversation if it's a follow-up question.
+2. ALWAYS cite sources.
 3. For follow-up questions like "summarize", "tell me more", "explain that", or "what about that":
    - Check the conversation history FIRST
    - Summarize or expand on your PREVIOUS answer
-   - Don't search for new information if the question refers to what you just said
 4. If user says "summarize that" or "summarize it": Condense your LAST answer (from conversation history)
 5. If no relevant info in sources OR history: "No sufficient information in the available documents"
 6. Use the SAME language as the question (English/German/Arabic)
 7. Be CONCISE - short, direct answers unless asked to elaborate
 8. For counting questions: Count precisely and list all items with citations
-
-FOLLOW-UP DETECTION:
-- "that", "it", "this", "summarize", "tell me more", "elaborate", "explain further" → Use conversation history
-- New factual questions → Use sources
+9. Do NOT explain your thought process.
+10. Answer directly and clearly.
+11. Append the relevant source(s) at the END of the answer.
 
 Remember: You're helping MBE students understand their program requirements clearly and accurately."""
             },
@@ -110,12 +71,13 @@ CURRENT QUESTION: {query}
 Instructions: 
 - If this is a follow-up (summarize/elaborate/that/it), answer from conversation history
 - If this is a new question, answer from sources with citations
-- Always be precise and cite your sources
+- Do NOT include your thought process
+- Always append the relevant source(s) at the END of your answer
 
 ANSWER:"""
             }
         ],
-        "temperature": 0.1,  # Slightly higher for better conversational flow
+        "temperature": 0.1,
         "max_tokens": 2000,
     }
    
