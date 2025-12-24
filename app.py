@@ -153,11 +153,6 @@ with st.sidebar:
     st.markdown("# 🧬 BioMed Doc Chat")
 
     files = get_files_from_folder()
-    if files:
-        st.success(f"✅ {len(files)} document(s)")
-        with st.expander("📂 Files"):
-            for f in files:
-                st.write(f"• {os.path.basename(f)}")
 
     st.markdown("---")
     st.markdown("### 💬 Chats")
