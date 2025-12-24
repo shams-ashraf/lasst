@@ -9,7 +9,7 @@ import hashlib
 
 # Configuration
 PDF_PASSWORD = "mbe2025"
-DOCS_FOLDER = "/mount/src/test/documents"
+DOCS_FOLDER = "/mount/src/lasst/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
@@ -368,3 +368,4 @@ def get_files_from_folder():
     for ext in supported_extensions:
         files.extend(glob.glob(os.path.join(DOCS_FOLDER, ext)))
     return files
+
