@@ -16,29 +16,25 @@ def get_embedding_function():
     )
 
 def build_conversational_prompt(query, chat_history):
-    """Build context-aware prompt with chat history"""
     if not chat_history:
         return query
-    
-    recent_history = chat_history[-6:]  
+    recent_history = chat_history[-6:]
     context_lines = []
-    
     for msg in recent_history:
         role = msg['role']
-        content = msg['content'][:200]  
+        content = msg['content'][:200]
         if role == 'user':
             context_lines.append(f"Previous Q: {content}")
         else:
             context_lines.append(f"Previous A: {content}")
-    
     history_context = "\n".join(context_lines)
     return f"Conversation context:\n{history_context}\n\nCurrent question: {query}"
 
 def answer_question_with_groq(query, relevant_chunks, chat_history=None):
     if not GROQ_API_KEY:
         return "❌ Please set GROQ_API_KEY in environment variables"
-  
-    context_parts = [chunk['content'] for chunk in relevant_chunks[:10]]
+   
+    context_parts = [chunk_data['content'] for chunk_data in relevant_chunks[:10]]
     context = "\n\n---\n\n".join(context_parts)
     
     conversation_summary = ""
@@ -50,27 +46,27 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
             content_preview = msg['content'][:300]
             conv_lines.append(f"{role}: {content_preview}")
         conversation_summary = "\n".join(conv_lines)
-    
+   
     data = {
         "model": GROQ_MODEL,
         "messages": [
             {
                 "role": "system",
                 "content": """You are a precise MBE Document Assistant at Hochschule Anhalt specializing in Biomedical Engineering regulations.
+
 CRITICAL RULES:
-1. Answer ONLY from provided sources OR previous conversation if it's a follow-up question.
-2. Use the SAME language as the question (English/German/Arabic).
-3. Be concise, short, and direct unless asked to elaborate.
-4. For counting questions: Count precisely and list all items.
-5. Do NOT explain your thought process.
-6. Do NOT mention sources, pages, citations, or references in your answer at all."""
+- Answer based only on provided content or previous conversation
+- Ignore source citations in answers
+- Use conversation history for follow-ups
+- Use same language as question
+- Be concise"""
             },
             {
                 "role": "user",
-                "content": f"""CONVERSATION HISTORY (use only for follow-up questions):
+                "content": f"""CONVERSATION HISTORY (for follow-ups):
 {conversation_summary if conversation_summary else "No previous conversation"}
 
-DOCUMENT SOURCES (use for new factual questions):
+DOCUMENT CONTENT:
 {context}
 
 CURRENT QUESTION: {query}
@@ -81,9 +77,7 @@ ANSWER:"""
         "temperature": 0.1,
         "max_tokens": 2000,
     }
-    
-    # ⚠️ حذفنا كل حاجة متعلقة بـ sources_list و citation building
-    
+   
     try:
         response = requests.post(
             "https://api.groq.com/openai/v1/chat/completions",
@@ -95,14 +89,6 @@ ANSWER:"""
             timeout=60
         )
         response.raise_for_status()
-        answer_text = response.json()["choices"][0]["message"]["content"].strip()
-        
-        # تنظيف إضافي لو الـ LLM حاول يكتب sources برضه (safety net)
-        lines = answer_text.splitlines()
-        cleaned_lines = [line for line in lines if not any(keyword in line.lower() for keyword in ["source", "quelle", "مصدر", "page", "seite", "صفحة", "citation", "📄"])]
-        answer_text = "\n".join(cleaned_lines).strip()
-        
-        return answer_text
-    
+        return response.json()["choices"][0]["message"]["content"]
     except Exception as e:
         return f"❌ Error connecting to Groq: {str(e)}"
