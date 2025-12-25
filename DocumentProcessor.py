@@ -7,7 +7,7 @@ import os
 import pickle
 import hashlib
 
-PDF_PASSWORD = "mbe2025"
+PDF_PASSWORD = os.getenv("PDF_PASSWORD", "")
 DOCS_FOLDER = "/mount/src/lasst/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
@@ -233,6 +233,7 @@ def get_files_from_folder():
     return glob.glob(os.path.join(DOCS_FOLDER, "*.[pP][dD][fF]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.[dD][oO][cC][xX]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.txt"))
+
 
 
 
