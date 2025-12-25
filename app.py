@@ -118,7 +118,6 @@ if not st.session_state.chats:
 st.markdown("""
 <div class="main-card">
     <h1 style='text-align:center;margin:0;'>🧬 Biomedical Document Chatbot</h1>
-    <p style='text-align:center;margin-top:10px;'>Your precise assistant for the Master Biomedical Engineering (MBE) program at Hochschule Anhalt</p>
 </div>
 
 <div class="main-card">
