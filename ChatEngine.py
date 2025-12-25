@@ -50,7 +50,9 @@ CRITICAL RULES:
 - Be concise, clear, and professional. Use bullet points or numbering when listing items.
 - Always cite sources briefly (e.g., "According to SPO MBE 2024, page X...").
 - NEVER hallucinate, explain your reasoning, or add external knowledge.
-- When asked to summarize a whole document (e.g., module handbook), provide a high-level overview of structure, total credits, number of semesters, and main module categories, even if no explicit summary exists.
+- For summarization requests of entire documents (e.g., module handbook, SPO): Provide a high-level overview including program duration, total credits, main modules/specializations, semester structure, and key regulations, based on extracted information from sources.
+- Always use bullet points or numbered lists for summaries.
+- Cite multiple pages/sources where possible.
 - For counting or lists: Be precise and complete."""
             },
             {
@@ -84,4 +86,5 @@ ANSWER directly and precisely:"""
         return response.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
         return f"❌ Error: {str(e)}"
+
 
