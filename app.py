@@ -1,4 +1,3 @@
-# <DOCUMENT filename="app.py"> (معدل ومحسن ليصل لـ 100% حسب الورقة)
 import streamlit as st
 import uuid
 import chromadb
@@ -92,7 +91,6 @@ else:
                 all_meta[len(all_chunks) - 1] = c["metadata"]
                 all_ids.append(f"chunk_{idx}_{len(all_chunks)}")
 
-        # إضافة دفعات أصغر لتجنب مشاكل الذاكرة
         batch_size = 300
         for i in range(0, len(all_chunks), batch_size):
             collection.add(
@@ -104,7 +102,6 @@ else:
         st.session_state.collection = collection
         st.success(f"✅ Processed {len(files)} documents successfully!")
 
-# إنشاء chat جديد إذا لم يكن موجود
 if not st.session_state.chats:
     cid = f"chat_{uuid.uuid4().hex[:6]}"
     st.session_state.chats[cid] = {
@@ -114,7 +111,6 @@ if not st.session_state.chats:
     }
     st.session_state.active_chat = cid
 
-# الـ UI الرئيسي
 st.markdown("""
 <div class="main-card">
     <h1 style='text-align:center;margin:0;'>🧬 Biomedical Document Chatbot</h1>
@@ -167,7 +163,6 @@ for m in chat["messages"]:
     with st.chat_message(m["role"]):
         st.markdown(m["content"])
 
-# Input
 if query := st.chat_input("Ask anything about the MBE program documents..."):
     chat["messages"].append({"role": "user", "content": query})
     if chat["title"] == "New Chat":
@@ -180,7 +175,7 @@ if query := st.chat_input("Ask anything about the MBE program documents..."):
         with st.spinner("Searching documents & thinking..."):
             res = st.session_state.collection.query(
                 query_texts=[query],
-                n_results=12  # زيادة قليلاً لسياق أفضل
+                n_results=12   
             )
             chunks = [{"content": d, "metadata": m} for d, m in zip(res["documents"][0], res["metadatas"][0])]
 
