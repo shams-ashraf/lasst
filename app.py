@@ -37,7 +37,7 @@ if "chats" not in st.session_state:
     st.session_state.chats = {}
     st.session_state.active_chat = None
 
-client = chromadb.PersistentClient(path=CHROMA_FOLDER)  # تحسين: استخدم PersistentClient للاستمرارية
+client = chromadb.PersistentClient(path=CHROMA_FOLDER)  
 
 collections = client.list_collections()
 
@@ -143,7 +143,7 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("### 💬 Your Chats")
-    for cid in reversed(list(st.session_state.chats.keys())):  # الأحدث فوق
+    for cid in reversed(list(st.session_state.chats.keys())):   
         chat = st.session_state.chats[cid]
         col1, col2 = st.columns([4, 1])
         with col1:
@@ -157,7 +157,6 @@ with st.sidebar:
                     st.session_state.active_chat = next(iter(st.session_state.chats), None)
                 st.rerun()
 
-# عرض المحادثة
 chat = st.session_state.chats[st.session_state.active_chat]
 for m in chat["messages"]:
     with st.chat_message(m["role"]):
