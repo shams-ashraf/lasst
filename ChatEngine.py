@@ -1,4 +1,3 @@
-# <DOCUMENT filename="ChatEngine.py"> (محسن: prompt أقوى، history أفضل، temperature أقل للدقة)
 import requests
 import os
 from sentence_transformers import SentenceTransformer
@@ -68,7 +67,7 @@ CURRENT QUESTION: {query}
 ANSWER directly and precisely:"""
             }
         ],
-        "temperature": 0.05,  # أقل لدقة أعلى
+        "temperature": 0.05,
         "max_tokens": 1500,
     }
 
@@ -86,5 +85,6 @@ ANSWER directly and precisely:"""
         return response.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
         return f"❌ Error: {str(e)}"
+
 
 
