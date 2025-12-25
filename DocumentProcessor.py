@@ -9,7 +9,7 @@ import pickle
 import hashlib
 
 PDF_PASSWORD = "mbe2025"
-DOCS_FOLDER = "/mount/src/chatbotlast/documents"  # أو غيره حسب البيئة
+DOCS_FOLDER = "/mount/src/lasst/documents"  # أو غيره حسب البيئة
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
