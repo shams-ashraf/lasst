@@ -27,7 +27,7 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
 
     conversation_summary = ""
     if chat_history and len(chat_history) > 1:
-        recent = chat_history[-8:]  # أكثر قليلاً لسياق أفضل
+        recent = chat_history[-8:]     
         conv_lines = []
         for msg in recent:
             role = "User" if msg["role"] == "user" else "Assistant"
@@ -85,6 +85,7 @@ ANSWER directly and precisely:"""
         return response.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
         return f"❌ Error: {str(e)}"
+
 
 
 
