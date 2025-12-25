@@ -1,4 +1,3 @@
-# <DOCUMENT filename="DocumentProcessor.py"> (أكبر تحسين: إضافة OCR كامل بـ PyMuPDF built-in + تحسين chunking)
 import streamlit as st
 import re
 import fitz  # PyMuPDF
@@ -9,7 +8,7 @@ import pickle
 import hashlib
 
 PDF_PASSWORD = "mbe2025"
-DOCS_FOLDER = "/mount/src/lasst/documents"  # أو غيره حسب البيئة
+DOCS_FOLDER = "/mount/src/lasst/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
@@ -45,7 +44,6 @@ def clean_text(text):
     return text
 
 def structure_text_into_paragraphs(text):
-    # نفس الكود السابق مع تحسينات طفيفة (شيلنا التكرار)
     if not text.strip():
         return ""
     lines = [line.strip() for line in text.split('\n') if line.strip()]
@@ -111,13 +109,11 @@ def extract_pdf_detailed(filepath):
     for page_num in range(len(doc)):
         page = doc[page_num]
 
-        # OCR كامل للصفحة إذا كان النص قليل (يعني scanned محتمل)
         text = page.get_text("text")
-        if len(text.strip()) < 100:  # إذا نص قليل → OCR كامل
+        if len(text.strip()) < 100:
             textpage = page.get_textpage_ocr(flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE, full=True)
             text = page.get_text("text", textpage=textpage)
 
-        # استخراج blocks للـ structuring
         blocks = page.get_text("dict")["blocks"]
         page_text = f"# {filename} - Page {page_num + 1}\n\n"
         for block in blocks:
@@ -129,7 +125,6 @@ def extract_pdf_detailed(filepath):
                 if block_text.strip():
                     page_text += structure_text_into_paragraphs(block_text) + "\n\n"
 
-        # Tables
         tables = page.find_tables()
         if tables:
             for t_num, table in enumerate(tables.tables, 1):
@@ -142,7 +137,6 @@ def extract_pdf_detailed(filepath):
                                                       source_file=filename, is_table=True, table_num=file_info['total_tables'])
                     file_info['chunks'].extend(table_chunks)
 
-        # Chunk الصفحة كاملة
         page_chunks = create_smart_chunks(page_text, chunk_size=800, overlap=100, page_num=page_num+1, source_file=filename)
         file_info['chunks'].extend(page_chunks)
 
@@ -239,5 +233,6 @@ def get_files_from_folder():
     return glob.glob(os.path.join(DOCS_FOLDER, "*.[pP][dD][fF]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.[dD][oO][cC][xX]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.txt"))
+
 
 
