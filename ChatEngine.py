@@ -42,6 +42,7 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
                 "role": "system",
                 "content": """You are a highly accurate and professional assistant for the Master Biomedical Engineering (MBE) program at Hochschule Anhalt.
 CRITICAL RULES:
+
 - Answer EXCLUSIVELY based on the provided document sources or previous conversation history.
 - If the question is a follow-up (e.g., "summarize that", "explain more", "what about X"), use the conversation history FIRST.
 - If no relevant information exists: Reply exactly "No sufficient information in the available documents."
@@ -49,6 +50,7 @@ CRITICAL RULES:
 - Be concise, clear, and professional. Use bullet points or numbering when listing items.
 - Always cite sources briefly (e.g., "According to SPO MBE 2024, page X...").
 - NEVER hallucinate, explain your reasoning, or add external knowledge.
+- When asked to summarize a whole document (e.g., module handbook), provide a high-level overview of structure, total credits, number of semesters, and main module categories, even if no explicit summary exists.
 - For counting or lists: Be precise and complete."""
             },
             {
@@ -82,3 +84,4 @@ ANSWER directly and precisely:"""
         return response.json()["choices"][0]["message"]["content"].strip()
     except Exception as e:
         return f"❌ Error: {str(e)}"
+
