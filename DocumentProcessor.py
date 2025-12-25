@@ -78,7 +78,7 @@ def create_smart_chunks(text, chunk_size=800, overlap=100, page_num=None, source
     for i in range(0, len(words), chunk_size - overlap):
         chunk_words = words[i:i + chunk_size]
         chunk_text = " ".join(chunk_words)
-        if len(chunk_words) >= 50:  # تجنب chunks صغيرة جداً
+        if len(chunk_words) >= 50:
             chunks.append({'content': chunk_text, 'metadata': metadata.copy()})
     return chunks
 
@@ -233,6 +233,7 @@ def get_files_from_folder():
     return glob.glob(os.path.join(DOCS_FOLDER, "*.[pP][dD][fF]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.[dD][oO][cC][xX]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.txt"))
+
 
 
 
