@@ -9,7 +9,7 @@ import pickle
 import hashlib
 
 PDF_PASSWORD = "mbe2025"
-DOCS_FOLDER = "/mount/src/lasst/documents"  # أو غيره حسب البيئة
+DOCS_FOLDER = "/mount/src/chatbotlast/documents"  # أو غيره حسب البيئة
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
@@ -149,10 +149,94 @@ def extract_pdf_detailed(filepath):
     doc.close()
     return file_info, None
 
-# extract_docx_detailed و extract_txt_detailed بدون تغيير كبير (كانت كويسة)
-# ... (نفس الكود السابق مع chunk_size=800, overlap=100)
-
 def get_files_from_folder():
     return glob.glob(os.path.join(DOCS_FOLDER, "*.[pP][dD][fF]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.[dD][oO][cC][xX]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.txt"))
+def extract_docx_detailed(filepath):
+    doc = docx.Document(filepath)
+    filename = os.path.basename(filepath)
+    file_info = {
+        'chunks': [],
+        'total_pages': 1,
+        'total_tables': 0,
+        'pages_with_tables': [],
+    }
+   
+    all_text = []
+    table_counter = 0
+   
+    for element in doc.element.body:
+        if element.tag.endswith('p'):
+            for para in doc.paragraphs:
+                if para._element == element:
+                    text = clean_text(para.text)
+                    if text:
+                        structured = structure_text_into_paragraphs(text)
+                        if structured:
+                            all_text.append(structured)
+                    break
+       
+        elif element.tag.endswith('tbl'):
+            for table in doc.tables:
+                if table._element == element:
+                    file_info['total_tables'] += 1
+                    table_counter += 1
+                    table_text = format_table_as_structured_text(
+                        [[cell.text for cell in row.cells] for row in table.rows],
+                        table_counter
+                    )
+                    if table_text:
+                        all_text.append(table_text)
+                        table_chunks = create_smart_chunks(
+                            table_text,
+                            chunk_size=2000,
+                            overlap=0,
+                            page_num=1,
+                            source_file=filename,
+                            is_table=True,
+                            table_num=table_counter
+                        )
+                        file_info['chunks'].extend(table_chunks)
+                    break
+   
+    complete_text = "\n\n".join(all_text)
+    text_chunks = create_smart_chunks(
+        complete_text, 
+        chunk_size=1500, 
+        overlap=250,
+        page_num=1,
+        source_file=filename
+    )
+    file_info['chunks'].extend(text_chunks)
+   
+    if file_info['total_tables'] > 0:
+        file_info['pages_with_tables'] = [1]
+   
+    return file_info, None
+
+def extract_txt_detailed(filepath):
+    filename = os.path.basename(filepath)
+    with open(filepath, 'r', encoding='utf-8', errors='ignore') as f:
+        text = f.read()
+    structured_text = structure_text_into_paragraphs(text)
+    chunks = create_smart_chunks(
+        structured_text, 
+        chunk_size=1500, 
+        overlap=250,
+        page_num=1,
+        source_file=filename
+    )
+    file_info = {
+        'chunks': chunks,
+        'total_pages': 1,
+        'total_tables': 0,
+        'pages_with_tables': [],
+    }
+    return file_info, None
+    
+def get_files_from_folder():
+    return glob.glob(os.path.join(DOCS_FOLDER, "*.[pP][dD][fF]")) + \
+           glob.glob(os.path.join(DOCS_FOLDER, "*.[dD][oO][cC][xX]")) + \
+           glob.glob(os.path.join(DOCS_FOLDER, "*.txt"))
+
