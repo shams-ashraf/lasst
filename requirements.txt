@@ -1,11 +1,11 @@
-# <DOCUMENT filename="requirements.txt"> (شيلنا الحاجات الغير ضرورية)
 streamlit
-PyMuPDF>=1.24.0  # لدعم OCR built-in
+PyMuPDF>=1.24.0  
 sentence-transformers
 chromadb
 requests
-langdetect  # لو عايزين detect language
+langdetect  
 python-docx
-pytesseract  # احتياطي لو عايزين OCR خارجي لاحقاً
+pytesseract  
 Pillow
 opencv-python-headless
+
