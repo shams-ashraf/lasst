@@ -1,14 +1,16 @@
 import streamlit as st
 import re
-import fitz  # PyMuPDF
-import docx
+import fitz
 import glob
 import os
 import pickle
 import hashlib
+from dotenv import load_dotenv
+
+load_dotenv()
 
 PDF_PASSWORD = os.getenv("PDF_PASSWORD", "")
-DOCS_FOLDER = "/mount/src/lasst/documents"
+DOCS_FOLDER = r"C:\Users\DELL\Desktop\lasst-main\lasst-main\documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
@@ -111,7 +113,11 @@ def extract_pdf_detailed(filepath):
 
         text = page.get_text("text")
         if len(text.strip()) < 100:
-            textpage = page.get_textpage_ocr(flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE, full=True)
+            textpage = page.get_textpage_ocr(
+                flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE,
+                full=True,
+                tessdata=r"C:\Program Files\Tesseract-OCR\tessdata"  
+            )            
             text = page.get_text("text", textpage=textpage)
 
         blocks = page.get_text("dict")["blocks"]
@@ -143,10 +149,6 @@ def extract_pdf_detailed(filepath):
     doc.close()
     return file_info, None
 
-def get_files_from_folder():
-    return glob.glob(os.path.join(DOCS_FOLDER, "*.[pP][dD][fF]")) + \
-           glob.glob(os.path.join(DOCS_FOLDER, "*.[dD][oO][cC][xX]")) + \
-           glob.glob(os.path.join(DOCS_FOLDER, "*.txt"))
 def extract_docx_detailed(filepath):
     doc = docx.Document(filepath)
     filename = os.path.basename(filepath)
