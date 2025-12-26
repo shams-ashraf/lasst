@@ -8,4 +8,4 @@ python-docx
 pytesseract  
 Pillow
 opencv-python-headless
-
+pymupdf-layout==1.26.6
