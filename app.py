@@ -24,9 +24,11 @@ st.set_page_config(
 
 load_custom_css()
 
+DOCS_FOLDER = os.path.join(os.path.dirname(__file__), "documents")
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 CHROMA_FOLDER = "./chroma_db"
 
+os.makedirs(DOCS_FOLDER, exist_ok=True)
 os.makedirs(CACHE_FOLDER, exist_ok=True)
 os.makedirs(CHROMA_FOLDER, exist_ok=True)
 
@@ -50,6 +52,15 @@ if collections:
 else:
     with st.spinner("📚 Processing documents... This may take a while for the first time."):
         files = get_files_from_folder()
+        st.write("🔍 Searching for documents in:")
+        st.code(DOCS_FOLDER)
+        st.write(f"Found {len(files)} files:")
+        if files:
+            for f in files:
+                st.write(f"- {f}")
+        else:
+            st.error("🚨 No files found! Check the folder path and file extensions.")
+            st.stop()
         if not files:
             st.error("No documents found in the documents folder!")
             st.stop()
@@ -57,12 +68,15 @@ else:
         collection = client.create_collection(
             name="biomed_docs",
             embedding_function=get_embedding_function(),
-            metadata={"hnsw:space": "cosine"}  # تحسين: cosine similarity لنتائج أفضل
+            metadata={"hnsw:space": "cosine"}  
         )
 
         all_chunks = []
         all_meta = {}
         all_ids = []
+
+        processed_files = []  
+        processed_count = 0  
 
         for idx, path in enumerate(files):
             name = os.path.basename(path)
@@ -72,7 +86,9 @@ else:
 
             if cached:
                 info = cached
+                st.success(f"✅ Loaded from cache: {name}") 
             else:
+                st.info(f"🔄 Processing: {name} ...") 
                 if ext == "pdf":
                     info, error = extract_pdf_detailed(path)
                 elif ext in ["doc", "docx"]:
@@ -80,16 +96,29 @@ else:
                 elif ext == "txt":
                     info, error = extract_txt_detailed(path)
                 else:
+                    st.warning(f"⚠️ Skipped unsupported file: {name}")
                     continue
                 if error:
-                    st.warning(error)
+                    st.warning(f"⚠️ Error in {name}: {error}")
                     continue
                 save_cache(key, info)
+
+            st.success(f"✅ Processed successfully: {name}")
+            processed_files.append(name)
+            processed_count += 1
 
             for c in info["chunks"]:
                 all_chunks.append(c["content"])
                 all_meta[len(all_chunks) - 1] = c["metadata"]
                 all_ids.append(f"chunk_{idx}_{len(all_chunks)}")
+
+        if processed_count > 0:
+            st.success(f"🎉 All done! Processed {processed_count} documents successfully!")
+            st.write("**Processed documents:**")
+            for file_name in processed_files:
+                st.write(f"- {file_name}")
+        else:
+            st.error("❌ No documents were processed!")
 
         batch_size = 300
         for i in range(0, len(all_chunks), batch_size):
