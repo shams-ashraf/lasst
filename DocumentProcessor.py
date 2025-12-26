@@ -116,7 +116,6 @@ def extract_pdf_detailed(filepath):
             textpage = page.get_textpage_ocr(
                 flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE,
                 full=True,
-                tessdata=r"C:\Program Files\Tesseract-OCR\tessdata"  
             )            
             text = page.get_text("text", textpage=textpage)
 
@@ -235,6 +234,7 @@ def get_files_from_folder():
     return glob.glob(os.path.join(DOCS_FOLDER, "*.[pP][dD][fF]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.[dD][oO][cC][xX]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.txt"))
+
 
 
 
