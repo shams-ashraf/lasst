@@ -201,11 +201,37 @@ if query := st.chat_input("Ask anything about the MBE program documents..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Searching documents & thinking..."):
+
+            # ===== ORIGINAL QUERY (AS-IS) =====
             res = st.session_state.collection.query(
                 query_texts=[query],
                 n_results=12   
             )
-            chunks = [{"content": d, "metadata": m} for d, m in zip(res["documents"][0], res["metadatas"][0])]
+
+            # ===== ADDITIONAL QUERY (ADDED ONLY) =====
+            res_extra = st.session_state.collection.query(
+                query_texts=[
+                    f"catalog {query}",
+                    f"Anlage {query}"
+                ],
+                n_results=12
+            )
+
+            # ===== MERGE RESULTS (ADDED) =====
+            docs = res["documents"][0] + res_extra["documents"][0]
+            metas = res["metadatas"][0] + res_extra["metadatas"][0]
+
+            chunks = [{"content": d, "metadata": m} for d, m in zip(docs, metas)]
+
+            # ===== LIGHT PRIORITIZATION (ADDED, SAFE) =====
+            chunks = sorted(
+                chunks,
+                key=lambda c: (
+                    c["metadata"].get("is_table") == "True",
+                    "Katalog" in c["content"] or "Anlage" in c["content"]
+                ),
+                reverse=True
+            )
 
             answer = answer_question_with_groq(query, chunks, chat["messages"])
             st.markdown(answer)
