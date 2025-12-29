@@ -3,6 +3,7 @@ import os
 from sentence_transformers import SentenceTransformer
 from dotenv import load_dotenv
 import json
+import re
 
 load_dotenv()
 
@@ -11,6 +12,28 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 
 if not GROQ_API_KEY:
     raise ValueError("⚠️ GROQ_API_KEY not set!")
+
+# ========== دالة مساعدة: تحديد تعقيد السؤال ==========
+def get_dynamic_n_results(query):
+    """تحديد عدد chunks المطلوبة حسب تعقيد السؤال"""
+    query_lower = query.lower()
+    
+    # كلمات تدل على أسئلة معقدة
+    complex_indicators = [
+        'compare', 'all', 'list', 'summarize', 'requirements', 
+        'differences', 'between', 'متطلبات', 'جميع', 'قارن',
+        'unterschied', 'alle', 'vergleich', 'zusammenfass'
+    ]
+    
+    # كلمات تدل على أسئلة بسيطة
+    simple_indicators = ['what is', 'define', 'who', 'when', 'where', 'was ist', 'ما هو']
+    
+    if any(ind in query_lower for ind in complex_indicators):
+        return 20
+    elif any(ind in query_lower for ind in simple_indicators):
+        return 8
+    
+    return 12  # default
 
 def get_embedding_function():
     from chromadb.utils import embedding_functions
