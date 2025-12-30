@@ -1,5 +1,6 @@
 import requests
 import os
+import time
 from sentence_transformers import SentenceTransformer
 import chromadb
 from chromadb.utils import embedding_functions
@@ -13,24 +14,53 @@ GROQ_MODEL = "llama-3.3-70b-versatile"
 if not GROQ_API_KEY:
     raise ValueError("⚠️ GROQ_API_KEY not set! Please add it to environment variables.")
 
+# ===============================
+# Global Rate Limit State (إضافة فقط)
+# ===============================
+GROQ_RATE_LIMIT_UNTIL = 0
+
+
 def get_embedding_function():
     return embedding_functions.SentenceTransformerEmbeddingFunction(
         model_name="intfloat/multilingual-e5-large"
     )
 
+
 def answer_question_with_groq(query, relevant_chunks, chat_history=None):
+    global GROQ_RATE_LIMIT_UNTIL
+
+    # ===============================
+    # Rate-limit gate (إضافة فقط)
+    # ===============================
+    now = time.time()
+    if now < GROQ_RATE_LIMIT_UNTIL:
+        wait_seconds = int(GROQ_RATE_LIMIT_UNTIL - now)
+        return (
+            f"⏳ Groq rate limit reached. Please wait {wait_seconds} seconds before sending a new request.",
+            []
+        )
+
     context_parts = []
+    used_chunks = []   # 👈 إضافة فقط
+
     for i, chunk in enumerate(relevant_chunks[:12], 1):
         source = chunk["metadata"].get("source", "Unknown")
         page = chunk["metadata"].get("page", "N/A")
         content = chunk["content"]
+
         context_parts.append(f"[Source: {source} | Page: {page}]\n{content}")
+
+        used_chunks.append({
+            "source": source,
+            "page": page,
+            "content": content
+        })
 
     context = "\n\n---\n\n".join(context_parts)
 
     conversation_summary = ""
     if chat_history and len(chat_history) > 1:
-        recent = chat_history[-8:]     
+        recent = chat_history[-8:]
         conv_lines = []
         for msg in recent:
             role = "User" if msg["role"] == "user" else "Assistant"
@@ -57,7 +87,9 @@ CRITICAL RULES:
 - Cite multiple pages/sources where possible.
 - When asked about Master's thesis registration or regulations, prioritize information from "94_B14_SPO_MBE..." or "Notes_on_final_theses..." documents.
 - For module handbook summaries, list key modules, their credits, and semester distribution if available.
-- For counting or lists: Be precise and complete."""
+- For counting or lists: Be precise and complete.
+-If a catalog contains both an outline (e.g., WPM codes) and a detailed list of modules, always prefer the detailed module list when the user asks for module names.
+"""
             },
             {
                 "role": "user",
@@ -87,6 +119,82 @@ ANSWER directly and precisely:"""
             timeout=60
         )
         response.raise_for_status()
-        return response.json()["choices"][0]["message"]["content"].strip()
+
+        return response.json()["choices"][0]["message"]["content"].strip(), used_chunks
+
+    except requests.exceptions.HTTPError as e:
+        if e.response is not None and e.response.status_code == 429:
+            retry_after = e.response.headers.get("Retry-After")
+            wait_time = int(retry_after) if retry_after else 60
+
+            GROQ_RATE_LIMIT_UNTIL = time.time() + wait_time
+
+            return (
+                f"⛔ Groq rate limit reached.\n"
+                f"⏳ Please wait {wait_time} seconds before trying again.",
+                []
+            )
+
+        return f"❌ HTTP Error: {str(e)}", []
+
     except Exception as e:
-        return f"❌ Error: {str(e)}"
+        return f"❌ Error: {str(e)}", []
+
+import re
+
+def detect_language(text):
+    text = text.lower()
+    if re.search(r'[äöüß]', text):
+        return "de"
+    if re.search(r'[a-z]', text):
+        return "en"
+    return "ar"
+
+def get_available_languages(collection):
+    langs = set()
+    metas = collection.get(include=["metadatas"])["metadatas"]
+    for m in metas:
+        if m and "lang" in m:
+            langs.add(m["lang"])
+    return list(langs)
+
+def translate_query(query, source_lang, target_lang):
+    if source_lang == target_lang:
+        return query
+
+    prompt = f"""
+Translate the following question from {source_lang} to {target_lang}.
+Keep it accurate, literal, and academic.
+Do NOT explain.
+
+Question:
+{query}
+"""
+
+    response = requests.post(
+        "https://api.groq.com/openai/v1/chat/completions",
+        headers={
+            "Authorization": f"Bearer {GROQ_API_KEY}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "model": GROQ_MODEL,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0
+        },
+        timeout=30
+    )
+
+    return response.json()["choices"][0]["message"]["content"].strip()
+
+def expand_query_multilingual(query, collection):
+    user_lang = detect_language(query)
+    doc_langs = get_available_languages(collection)
+
+    expanded_queries = []
+    for lang in doc_langs:
+        expanded_queries.append(
+            translate_query(query, user_lang, lang)
+        )
+
+    return expanded_queries
