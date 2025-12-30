@@ -15,7 +15,7 @@ from DocumentProcessor import (
     extract_txt_detailed,
     save_cache
 )
-from ChatEngine import get_embedding_function, answer_question_with_groq,expand_query_multilingual
+from ChatEngine import ImprovedChatEngine, get_embedding_function
 
 st.set_page_config(
     page_title="Biomedical Document Chatbot",
@@ -26,7 +26,7 @@ st.set_page_config(
 
 load_custom_css()
 
-DOCS_FOLDER = "/mount/src/lasst/documents"
+DOCS_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), "documents")
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 CHROMA_FOLDER = "./chroma_db"
 
@@ -41,7 +41,10 @@ if "chats" not in st.session_state:
     st.session_state.chats = {}
     st.session_state.active_chat = None
 
-client = chromadb.PersistentClient(path=CHROMA_FOLDER)  
+if "chat_engine" not in st.session_state:
+    st.session_state.chat_engine = ImprovedChatEngine()
+
+client = chromadb.PersistentClient(path=CHROMA_FOLDER)
 
 collections = client.list_collections()
 
@@ -63,22 +66,21 @@ else:
         else:
             st.error("🚨 No files found! Check the folder path and file extensions.")
             st.stop()
-        if not files:
-            st.error("No documents found in the documents folder!")
-            st.stop()
 
         collection = client.create_collection(
             name="biomed_docs",
             embedding_function=get_embedding_function(),
-            metadata={"hnsw:space": "cosine"}  
+            metadata={"hnsw:space": "cosine"}
         )
 
         all_chunks = []
         all_meta = {}
         all_ids = []
 
-        processed_files = []  
-        processed_count = 0  
+        processed_files = []
+        processed_count = 0
+
+        progress_bar = st.progress(0)
 
         for idx, path in enumerate(files):
             name = os.path.basename(path)
@@ -88,9 +90,9 @@ else:
 
             if cached:
                 info = cached
-                st.success(f"✅ Loaded from cache: {name}") 
+                st.success(f"✅ Loaded from cache: {name}")
             else:
-                st.info(f"🔄 Processing: {name} ...") 
+                st.info(f"📄 Processing: {name} ...")
                 if ext == "pdf":
                     info, error = extract_pdf_detailed(path)
                 elif ext in ["doc", "docx"]:
@@ -113,6 +115,8 @@ else:
                 all_chunks.append(c["content"])
                 all_meta[len(all_chunks) - 1] = c["metadata"]
                 all_ids.append(f"chunk_{idx}_{len(all_chunks)}")
+
+            progress_bar.progress((idx + 1) / len(files))
 
         if processed_count > 0:
             st.success(f"🎉 All done! Processed {processed_count} documents successfully!")
@@ -153,13 +157,11 @@ st.markdown("""
     <ul style="font-size:1.05rem;">
         <li>What are the requirements for registering the master's thesis?</li>
         <li>Tell me about the internship requirements</li>
-        <li>Summarize the module handbook</li>
         <li>Was sind die Regelungen für die Masterarbeit?</li>
     </ul>
 </div>
 """, unsafe_allow_html=True)
 
-# Sidebar
 with st.sidebar:
     st.markdown("# 🧬 BioMed Chat")
 
@@ -174,7 +176,7 @@ with st.sidebar:
         st.rerun()
 
     st.markdown("### 💬 Your Chats")
-    for cid in reversed(list(st.session_state.chats.keys())):   
+    for cid in reversed(list(st.session_state.chats.keys())):
         chat = st.session_state.chats[cid]
         col1, col2 = st.columns([4, 1])
         with col1:
@@ -203,15 +205,13 @@ if query := st.chat_input("Ask anything about the MBE program documents..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Searching documents & thinking..."):
-            queries = expand_query_multilingual(
-                query,
-                st.session_state.collection
-            )
-
+            n_results = min(20, max(10, len(chat.get("context", []))))
+            
             res = st.session_state.collection.query(
-                query_texts=queries,
-                n_results=15
+                query_texts=[query],
+                n_results=n_results
             )
+            
             chunks = []
             for docs, metas in zip(res["documents"], res["metadatas"]):
                 for d, m in zip(docs, metas):
@@ -220,10 +220,11 @@ if query := st.chat_input("Ask anything about the MBE program documents..."):
                         "metadata": m
                     })
 
-            answer, used_chunks = answer_question_with_groq(query, chunks, chat["messages"])
+            answer, used_chunks = st.session_state.chat_engine.answer_question_with_groq(
+                query, chunks, chat["messages"]
+            )
             st.markdown(answer)
 
-            # ⏳ Live countdown لو فيه rate limit
             match = re.search(r'wait (\d+) seconds', answer.lower())
             if match:
                 remaining = int(match.group(1))
@@ -234,12 +235,11 @@ if query := st.chat_input("Ask anything about the MBE program documents..."):
                     remaining -= 1
                 countdown.success("✅ You can now send a new question.")
 
-            st.markdown("### 📚 Answer was based on the following document excerpts:")
-            for i, ch in enumerate(used_chunks, 1):
-                with st.expander(f"📄 {ch['source']} — Page {ch['page']}"):
-                    st.markdown(ch["content"])
+            if used_chunks:
+                st.markdown("### 📚 Answer was based on the following document excerpts:")
+                for i, ch in enumerate(used_chunks, 1):
+                    with st.expander(f"📄 {ch['source']} — Page {ch['page']}"):
+                        st.markdown(ch["content"])
 
     chat["messages"].append({"role": "assistant", "content": answer})
     chat["context"] = chunks
-    
-
