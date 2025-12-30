@@ -2,6 +2,7 @@ import requests
 import time
 import hashlib
 import os
+from chromadb.utils import embedding_functions
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = "llama-3.3-70b-versatile"
@@ -14,7 +15,6 @@ def build_answer_cache_key(query: str, context: str) -> str:
     h.update((query + context).encode("utf-8"))
     return h.hexdigest()
 
-from chromadb.utils import embedding_functions
 
 def get_embedding_function():
     return embedding_functions.SentenceTransformerEmbeddingFunction(
@@ -144,4 +144,5 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
 
     # ---------- Absolute fallback ----------
     return "No sufficient information in the available documents."
+
 
