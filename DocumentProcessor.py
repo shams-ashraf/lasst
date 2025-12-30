@@ -10,11 +10,18 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PDF_PASSWORD = os.getenv("PDF_PASSWORD", "")
-DOCS_FOLDER = "/mount/src/lasst/documents"
+DOCS_FOLDER = r"C:\Users\DELL\Desktop\lasst-main\documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
 os.makedirs(CACHE_FOLDER, exist_ok=True)
+def detect_doc_language(filename):
+    name = filename.lower()
+    if any(x in name for x in ["de", "german", "spo"]):
+        return "de"
+    if any(x in name for x in ["en", "english"]):
+        return "en"
+    return "ar"
 
 def get_file_hash(filepath):
     hash_md5 = hashlib.md5()
@@ -66,12 +73,15 @@ def structure_text_into_paragraphs(text):
 def create_smart_chunks(text, chunk_size=800, overlap=100, page_num=None, source_file=None, is_table=False, table_num=None):
     words = text.split()
     chunks = []
+    lang = detect_doc_language(source_file or "")
     metadata = {
-        'page': str(page_num) if page_num is not None else "N/A",
-        'source': source_file or "Unknown",
-        'is_table': str(is_table),
-        'table_number': str(table_num) if table_num else "N/A"
+    'page': str(page_num) if page_num is not None else "N/A",
+    'source': source_file or "Unknown",
+    'is_table': str(is_table),
+    'table_number': str(table_num) if table_num else "N/A",
+    'lang': lang
     }
+
     if len(words) <= chunk_size:
         if text.strip():
             chunks.append({'content': text.strip(), 'metadata': metadata})
@@ -116,33 +126,72 @@ def extract_pdf_detailed(filepath):
             textpage = page.get_textpage_ocr(
                 flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE,
                 full=True,
-            )            
+            )
             text = page.get_text("text", textpage=textpage)
 
         blocks = page.get_text("dict")["blocks"]
         page_text = f"# {filename} - Page {page_num + 1}\n\n"
+
+        last_text_block = ""  # 👈 نخزن آخر فقرة قبل الجدول
+
         for block in blocks:
             if block.get("type") == 0:
                 block_text = ""
                 for line in block.get("lines", []):
                     for span in line.get("spans", []):
                         block_text += span.get("text", "")
-                if block_text.strip():
-                    page_text += structure_text_into_paragraphs(block_text) + "\n\n"
+                block_text = block_text.strip()
+
+                if block_text:
+                    structured = structure_text_into_paragraphs(block_text)
+                    page_text += structured + "\n\n"
+                    last_text_block = structured  # 👈 تحديث آخر نص
 
         tables = page.find_tables()
         if tables:
             for t_num, table in enumerate(tables.tables, 1):
                 file_info['total_tables'] += 1
                 extracted = table.extract()
+
                 if extracted:
-                    table_text = format_table_as_structured_text(extracted, file_info['total_tables'])
-                    page_text += table_text + "\n\n"
-                    table_chunks = create_smart_chunks(table_text, chunk_size=1500, overlap=0, page_num=page_num+1,
-                                                      source_file=filename, is_table=True, table_num=file_info['total_tables'])
+                    table_text = format_table_as_structured_text(
+                        extracted,
+                        file_info['total_tables']
+                    )
+
+                    combined_text = ""
+
+                    if last_text_block:
+                        last_line = last_text_block.strip().split("\n")[-1].strip()
+
+                        if (
+                            not last_line.endswith(".")
+                            or last_line.endswith(":")
+                            or len(last_line.split()) <= 12
+                        ):
+                            combined_text += last_text_block + "\n\n"
+
+                    combined_text += table_text
+
+                    table_chunks = create_smart_chunks(
+                        combined_text,
+                        chunk_size=1800,
+                        overlap=0,
+                        page_num=page_num + 1,
+                        source_file=filename,
+                        is_table=True,
+                        table_num=file_info['total_tables']
+                    )
+
                     file_info['chunks'].extend(table_chunks)
 
-        page_chunks = create_smart_chunks(page_text, chunk_size=800, overlap=100, page_num=page_num+1, source_file=filename)
+        page_chunks = create_smart_chunks(
+            page_text,
+            chunk_size=800,
+            overlap=100,
+            page_num=page_num + 1,
+            source_file=filename
+        )
         file_info['chunks'].extend(page_chunks)
 
     doc.close()
@@ -234,10 +283,3 @@ def get_files_from_folder():
     return glob.glob(os.path.join(DOCS_FOLDER, "*.[pP][dD][fF]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.[dD][oO][cC][xX]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.txt"))
-
-
-
-
-
-
-
