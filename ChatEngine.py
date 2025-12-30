@@ -14,6 +14,12 @@ def build_answer_cache_key(query: str, context: str) -> str:
     h.update((query + context).encode("utf-8"))
     return h.hexdigest()
 
+from chromadb.utils import embedding_functions
+
+def get_embedding_function():
+    return embedding_functions.SentenceTransformerEmbeddingFunction(
+        model_name="intfloat/multilingual-e5-large"
+    )
 
 def answer_question_with_groq(query, relevant_chunks, chat_history=None):
     """
@@ -138,3 +144,4 @@ def answer_question_with_groq(query, relevant_chunks, chat_history=None):
 
     # ---------- Absolute fallback ----------
     return "No sufficient information in the available documents."
+
