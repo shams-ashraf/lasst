@@ -257,6 +257,9 @@ if query := st.chat_input("Ask anything about the MBE program documents..."):
             # Dynamic retrieval
             n_results = get_dynamic_n_results(query)
             
+            status_placeholder = st.empty()
+            status_placeholder.caption(f"🔎 Retrieving {n_results} chunks...")
+            
             # Initial retrieval
             res = st.session_state.collection.query(
                 query_texts=[query],
@@ -268,14 +271,22 @@ if query := st.chat_input("Ask anything about the MBE program documents..."):
                 for d, m in zip(res["documents"][0], res["metadatas"][0])
             ]
             
+            status_placeholder.caption(f"⚙️ Re-ranking {len(chunks)} chunks...")
+            
             # Re-rank chunks
-            reranked_chunks = rerank_chunks(query, chunks)
+            try:
+                reranked_chunks = rerank_chunks(query, chunks)
+            except Exception as e:
+                st.warning(f"⚠️ Re-ranking failed: {str(e)}")
+                reranked_chunks = chunks[:8]
             
             # Display retrieval stats
-            st.caption(f"🔎 Retrieved {len(chunks)} chunks → Re-ranked to {len(reranked_chunks)} most relevant")
+            status_placeholder.caption(f"✅ Retrieved {len(chunks)} → Re-ranked to {len(reranked_chunks)} most relevant")
             
             # Generate answer
             answer = answer_question_with_groq(query, reranked_chunks, chat["messages"])
+            
+            status_placeholder.empty()
             st.markdown(answer)
             
             # Extract sources for display
