@@ -2,6 +2,8 @@ import streamlit as st
 import uuid
 import chromadb
 import os
+import re
+import time
 from styles import load_custom_css
 
 from DocumentProcessor import (
@@ -13,7 +15,7 @@ from DocumentProcessor import (
     extract_txt_detailed,
     save_cache
 )
-from ChatEngine import get_embedding_function, answer_question_with_groq
+from ChatEngine import get_embedding_function, answer_question_with_groq,expand_query_multilingual
 
 st.set_page_config(
     page_title="Biomedical Document Chatbot",
@@ -201,14 +203,43 @@ if query := st.chat_input("Ask anything about the MBE program documents..."):
 
     with st.chat_message("assistant"):
         with st.spinner("Searching documents & thinking..."):
-            res = st.session_state.collection.query(
-                query_texts=[query],
-                n_results=12   
+            queries = expand_query_multilingual(
+                query,
+                st.session_state.collection
             )
-            chunks = [{"content": d, "metadata": m} for d, m in zip(res["documents"][0], res["metadatas"][0])]
 
-            answer = answer_question_with_groq(query, chunks, chat["messages"])
+            res = st.session_state.collection.query(
+                query_texts=queries,
+                n_results=15
+            )
+            chunks = []
+            for docs, metas in zip(res["documents"], res["metadatas"]):
+                for d, m in zip(docs, metas):
+                    chunks.append({
+                        "content": d,
+                        "metadata": m
+                    })
+
+            answer, used_chunks = answer_question_with_groq(query, chunks, chat["messages"])
             st.markdown(answer)
+
+            # ⏳ Live countdown لو فيه rate limit
+            match = re.search(r'wait (\d+) seconds', answer.lower())
+            if match:
+                remaining = int(match.group(1))
+                countdown = st.empty()
+                while remaining > 0:
+                    countdown.warning(f"⏳ Please wait {remaining} seconds before sending a new request...")
+                    time.sleep(1)
+                    remaining -= 1
+                countdown.success("✅ You can now send a new question.")
+
+            st.markdown("### 📚 Answer was based on the following document excerpts:")
+            for i, ch in enumerate(used_chunks, 1):
+                with st.expander(f"📄 {ch['source']} — Page {ch['page']}"):
+                    st.markdown(ch["content"])
 
     chat["messages"].append({"role": "assistant", "content": answer})
     chat["context"] = chunks
+    
+
