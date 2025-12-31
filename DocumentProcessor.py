@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PDF_PASSWORD = os.getenv("PDF_PASSWORD", "")
-DOCS_FOLDER ="/mount/src/lasst/documents"
+DOCS_FOLDER = "/mount/src/lasst/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
@@ -127,6 +127,7 @@ def extract_pdf_detailed(filepath):
             textpage = page.get_textpage_ocr(
                 flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE,
                 full=True,
+                # tessdata=r"C:\Program Files\Tesseract-OCR\tessdata"
             )
             text = page.get_text("text", textpage=textpage)
 
@@ -284,4 +285,3 @@ def get_files_from_folder():
     return glob.glob(os.path.join(DOCS_FOLDER, "*.[pP][dD][fF]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.[dD][oO][cC][xX]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.txt"))
-
