@@ -10,34 +10,19 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PDF_PASSWORD = os.getenv("PDF_PASSWORD", "")
-DOCS_FOLDER = "/mount/src/lasst/documents"
+DOCS_FOLDER ="/mount/src/lasst/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 
 os.makedirs(DOCS_FOLDER, exist_ok=True)
 os.makedirs(CACHE_FOLDER, exist_ok=True)
 
-
-def detect_doc_language(filename, content_sample=""):
+def detect_doc_language(filename):
     name = filename.lower()
-    
     if any(x in name for x in ["de", "german", "spo"]):
         return "de"
     if any(x in name for x in ["en", "english"]):
         return "en"
-    if any(x in name for x in ["ar", "arabic"]):
-        return "ar"
-    
-    if content_sample:
-        try:
-            from langdetect import detect
-            detected = detect(content_sample[:500])
-            if detected in ['de', 'en', 'ar']:
-                return detected
-        except:
-            pass
-    
-    return "en"
-
+    return "ar"
 
 def get_file_hash(filepath):
     hash_md5 = hashlib.md5()
@@ -45,7 +30,6 @@ def get_file_hash(filepath):
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
-
 
 def load_cache(cache_key):
     cache_file = os.path.join(CACHE_FOLDER, f"{cache_key}.pkl")
@@ -57,7 +41,6 @@ def load_cache(cache_key):
             return None
     return None
 
-
 def save_cache(cache_key, data):
     cache_file = os.path.join(CACHE_FOLDER, f"{cache_key}.pkl")
     try:
@@ -66,11 +49,9 @@ def save_cache(cache_key, data):
     except Exception as e:
         st.warning(f"⚠️ Cache save error: {str(e)}")
 
-
 def clean_text(text):
     text = re.sub(r'\s+', ' ', text).strip()
     return text
-
 
 def structure_text_into_paragraphs(text):
     if not text.strip():
@@ -90,44 +71,17 @@ def structure_text_into_paragraphs(text):
         paragraphs.append(' '.join(current))
     return '\n\n'.join(paragraphs)
 
-
-def enrich_metadata(metadata, source_file):
-    if 'SPO' in source_file or '94_B14' in source_file:
-        metadata['doc_type'] = 'regulation'
-        metadata['priority'] = 'high'
-    elif 'Guide' in source_file or 'guide' in source_file.lower():
-        metadata['doc_type'] = 'guide'
-        metadata['priority'] = 'medium'
-    elif 'Handbook' in source_file or 'handbook' in source_file.lower():
-        metadata['doc_type'] = 'handbook'
-        metadata['priority'] = 'medium'
-    elif 'Notes' in source_file or 'notes' in source_file.lower():
-        metadata['doc_type'] = 'notes'
-        metadata['priority'] = 'high'
-    else:
-        metadata['doc_type'] = 'document'
-        metadata['priority'] = 'low'
-    
-    return metadata
-
-
 def create_smart_chunks(text, chunk_size=800, overlap=100, page_num=None, source_file=None, is_table=False, table_num=None):
     words = text.split()
     chunks = []
-    
-    content_sample = ' '.join(words[:100]) if len(words) > 100 else text
-    lang = detect_doc_language(source_file or "", content_sample)
-    
+    lang = detect_doc_language(source_file or "")
     metadata = {
-        'page': str(page_num) if page_num is not None else "N/A",
-        'source': source_file or "Unknown",
-        'is_table': str(is_table),
-        'table_number': str(table_num) if table_num else "N/A",
-        'lang': lang,
-        'word_count': len(words)
+    'page': str(page_num) if page_num is not None else "N/A",
+    'source': source_file or "Unknown",
+    'is_table': str(is_table),
+    'table_number': str(table_num) if table_num else "N/A",
+    'lang': lang
     }
-    
-    metadata = enrich_metadata(metadata, source_file or "")
 
     if len(words) <= chunk_size:
         if text.strip():
@@ -138,12 +92,8 @@ def create_smart_chunks(text, chunk_size=800, overlap=100, page_num=None, source
         chunk_words = words[i:i + chunk_size]
         chunk_text = " ".join(chunk_words)
         if len(chunk_words) >= 50:
-            chunk_metadata = metadata.copy()
-            chunk_metadata['chunk_index'] = len(chunks)
-            chunks.append({'content': chunk_text, 'metadata': chunk_metadata})
-    
+            chunks.append({'content': chunk_text, 'metadata': metadata.copy()})
     return chunks
-
 
 def format_table_as_structured_text(table, table_number=None):
     if not table or len(table) == 0:
@@ -157,7 +107,6 @@ def format_table_as_structured_text(table, table_number=None):
         if any(cells):
             text += "| " + " | ".join(cells) + " |\n"
     return text
-
 
 def extract_pdf_detailed(filepath):
     try:
@@ -175,20 +124,17 @@ def extract_pdf_detailed(filepath):
 
         text = page.get_text("text")
         if len(text.strip()) < 100:
-            try:
-                textpage = page.get_textpage_ocr(
-                    flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE,
-                    full=True,
-                    tessdata=r"C:\Program Files\Tesseract-OCR\tessdata"
-                )
-                text = page.get_text("text", textpage=textpage)
-            except:
-                pass
+            textpage = page.get_textpage_ocr(
+                flags=fitz.TEXT_PRESERVE_LIGATURES | fitz.TEXT_PRESERVE_WHITESPACE,
+                full=True,
+                tessdata=r"C:\Program Files\Tesseract-OCR\tessdata"
+            )
+            text = page.get_text("text", textpage=textpage)
 
         blocks = page.get_text("dict")["blocks"]
         page_text = f"# {filename} - Page {page_num + 1}\n\n"
 
-        last_text_block = ""
+        last_text_block = ""  
 
         for block in blocks:
             if block.get("type") == 0:
@@ -201,7 +147,7 @@ def extract_pdf_detailed(filepath):
                 if block_text:
                     structured = structure_text_into_paragraphs(block_text)
                     page_text += structured + "\n\n"
-                    last_text_block = structured
+                    last_text_block = structured  
 
         tables = page.find_tables()
         if tables:
@@ -253,13 +199,7 @@ def extract_pdf_detailed(filepath):
     doc.close()
     return file_info, None
 
-
 def extract_docx_detailed(filepath):
-    try:
-        import docx
-    except ImportError:
-        return None, "❌ python-docx not installed"
-    
     doc = docx.Document(filepath)
     filename = os.path.basename(filepath)
     file_info = {
@@ -268,10 +208,10 @@ def extract_docx_detailed(filepath):
         'total_tables': 0,
         'pages_with_tables': [],
     }
-
+   
     all_text = []
     table_counter = 0
-
+   
     for element in doc.element.body:
         if element.tag.endswith('p'):
             for para in doc.paragraphs:
@@ -282,7 +222,7 @@ def extract_docx_detailed(filepath):
                         if structured:
                             all_text.append(structured)
                     break
-
+       
         elif element.tag.endswith('tbl'):
             for table in doc.tables:
                 if table._element == element:
@@ -305,22 +245,21 @@ def extract_docx_detailed(filepath):
                         )
                         file_info['chunks'].extend(table_chunks)
                     break
-
+   
     complete_text = "\n\n".join(all_text)
     text_chunks = create_smart_chunks(
-        complete_text,
-        chunk_size=1500,
+        complete_text, 
+        chunk_size=1500, 
         overlap=250,
         page_num=1,
         source_file=filename
     )
     file_info['chunks'].extend(text_chunks)
-
+   
     if file_info['total_tables'] > 0:
         file_info['pages_with_tables'] = [1]
-
+   
     return file_info, None
-
 
 def extract_txt_detailed(filepath):
     filename = os.path.basename(filepath)
@@ -328,8 +267,8 @@ def extract_txt_detailed(filepath):
         text = f.read()
     structured_text = structure_text_into_paragraphs(text)
     chunks = create_smart_chunks(
-        structured_text,
-        chunk_size=1500,
+        structured_text, 
+        chunk_size=1500, 
         overlap=250,
         page_num=1,
         source_file=filename
@@ -341,8 +280,7 @@ def extract_txt_detailed(filepath):
         'pages_with_tables': [],
     }
     return file_info, None
-
-
+    
 def get_files_from_folder():
     return glob.glob(os.path.join(DOCS_FOLDER, "*.[pP][dD][fF]")) + \
            glob.glob(os.path.join(DOCS_FOLDER, "*.[dD][oO][cC][xX]")) + \
