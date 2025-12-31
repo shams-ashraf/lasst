@@ -26,7 +26,7 @@ st.set_page_config(
 
 load_custom_css()
 
-DOCS_FOLDER = "/mount/src/lasst/documents"
+DOCS_FOLDER =  "/mount/src/lasst/documents"
 CACHE_FOLDER = os.getenv("CACHE_FOLDER", "./cache")
 CHROMA_FOLDER = "./chroma_db"
 
